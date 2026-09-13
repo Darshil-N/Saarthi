@@ -8,7 +8,7 @@ import EntryHome from './pages/entry/EntryHome';
 import NewReceipt from './pages/entry/NewReceipt';
 import PendingApprovals from './pages/entry/PendingApprovals';
 import ReceiptHistory from './pages/entry/ReceiptHistory';
-import { Locations, EngineerDashboard, AdminDashboard } from './pages/Stubs';
+import { Locations, EngineerDashboard } from './pages/Stubs';
 import AccountsDashboard from '../../a_p/AccountsDashboard';
 import AccountsHome from '../../a_p/pages/AccountsHome';
 import PriceIntelligence from '../../a_p/pages/PriceIntelligence';
@@ -16,6 +16,15 @@ import StockValuation from '../../a_p/pages/StockValuation';
 import VendorAnalysis from '../../a_p/pages/VendorAnalysis';
 import PurchaseHistory from '../../a_p/pages/PurchaseHistory';
 import ProtectedRoute from './components/layout/ProtectedRoute';
+
+// Admin Imports
+import AdminDashboard from '../../a_p/AdminDashboard';
+import AdminHome from '../../a_p/pages/AdminHome';
+import MaterialGovernance from '../../a_p/pages/MaterialGovernance';
+import AuditTrail from '../../a_p/pages/AuditTrail';
+import DuplicateDetection from '../../a_p/pages/DuplicateDetection';
+import UserManagement from '../../a_p/pages/UserManagement';
+import SystemHealth from '../../a_p/pages/SystemHealth';
 
 function App() {
   return (
@@ -48,7 +57,14 @@ function App() {
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="admin" />}>
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin" element={<AdminDashboard />}>
+          <Route index element={<AdminHome />} />
+          <Route path="material-governance" element={<MaterialGovernance />} />
+          <Route path="audit-trail" element={<AuditTrail />} />
+          <Route path="duplicate-detection" element={<DuplicateDetection />} />
+          <Route path="user-management" element={<UserManagement />} />
+          <Route path="system-health" element={<SystemHealth />} />
+        </Route>
       </Route>
     </Routes>
   );

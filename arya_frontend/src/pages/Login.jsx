@@ -32,10 +32,14 @@ export default function Login() {
       let mockRole = 'entry_operator';
       let redirectPath = '/entry';
 
-      if (email === 'accounts@test.com') {
+      if (email === 'accounts@test.com' || email === 'accounts@bharatoil.in') {
         mockUser = { full_name: 'Accounts Tester' };
         mockRole = 'accounts';
         redirectPath = '/accounts';
+      } else if (email === 'admin@test.com' || email === 'admin@bharatoil.in') {
+        mockUser = { full_name: 'System Admin' };
+        mockRole = 'admin';
+        redirectPath = '/admin';
       }
 
       const mockSession = { access_token: 'mock-jwt-token' };
