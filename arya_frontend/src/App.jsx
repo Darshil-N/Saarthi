@@ -8,7 +8,13 @@ import EntryHome from './pages/entry/EntryHome';
 import NewReceipt from './pages/entry/NewReceipt';
 import PendingApprovals from './pages/entry/PendingApprovals';
 import ReceiptHistory from './pages/entry/ReceiptHistory';
-import { Locations, EngineerDashboard, AccountsDashboard, AdminDashboard } from './pages/Stubs';
+import { Locations, EngineerDashboard, AdminDashboard } from './pages/Stubs';
+import AccountsDashboard from '../../a_p/AccountsDashboard';
+import AccountsHome from '../../a_p/pages/AccountsHome';
+import PriceIntelligence from '../../a_p/pages/PriceIntelligence';
+import StockValuation from '../../a_p/pages/StockValuation';
+import VendorAnalysis from '../../a_p/pages/VendorAnalysis';
+import PurchaseHistory from '../../a_p/pages/PurchaseHistory';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 function App() {
@@ -32,7 +38,13 @@ function App() {
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="accounts" />}>
-        <Route path="/accounts" element={<AccountsDashboard />} />
+        <Route path="/accounts" element={<AccountsDashboard />}>
+          <Route index element={<AccountsHome />} />
+          <Route path="price-intelligence" element={<PriceIntelligence />} />
+          <Route path="stock-valuation" element={<StockValuation />} />
+          <Route path="vendor-analysis" element={<VendorAnalysis />} />
+          <Route path="purchase-history" element={<PurchaseHistory />} />
+        </Route>
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="admin" />}>

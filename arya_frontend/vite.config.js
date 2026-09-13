@@ -7,6 +7,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'react': path.resolve(__dirname, './node_modules/react'),
+      'react-router-dom': path.resolve(__dirname, './node_modules/react-router-dom'),
+      'lucide-react': path.resolve(__dirname, './node_modules/lucide-react'),
+      'recharts': path.resolve(__dirname, './node_modules/recharts')
     },
   },
 });

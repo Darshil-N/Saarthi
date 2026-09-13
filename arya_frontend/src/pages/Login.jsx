@@ -28,10 +28,17 @@ export default function Login() {
         throw new Error('Please enter both email and password.');
       }
 
-      // Hardcode the user as an entry operator for local testing
+      let mockUser = { full_name: 'Test Operator' };
+      let mockRole = 'entry_operator';
+      let redirectPath = '/entry';
+
+      if (email === 'accounts@test.com') {
+        mockUser = { full_name: 'Accounts Tester' };
+        mockRole = 'accounts';
+        redirectPath = '/accounts';
+      }
+
       const mockSession = { access_token: 'mock-jwt-token' };
-      const mockUser = { full_name: 'Test Operator' };
-      const mockRole = 'entry_operator';
 
       // Persist to local storage for our mock useAuth hook
       localStorage.setItem('mock_auth', JSON.stringify({ 
@@ -41,7 +48,7 @@ export default function Login() {
       }));
 
       login(mockSession, mockUser, mockRole);
-      navigate('/entry');
+      navigate(redirectPath);
 
     } catch (err) {
       setError(err.message || 'Failed to sign in. Please check your credentials.');
