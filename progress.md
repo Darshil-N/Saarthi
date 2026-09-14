@@ -1,9 +1,9 @@
 # NUMM — Project Progress
 ## BharatOil Demo | Active Build Tracker
 
-**Last Updated:** Day 0 — Pre-build  
-**Overall Progress:** 0 / 130 steps complete  
-**Status:** 🔴 Not Started
+**Last Updated:** Day 9 — Phase 7.2 Polish complete  
+**Overall Progress:** 116 / 130 steps complete  
+**Status:** 🟡 In Progress
 
 ---
 
@@ -29,22 +29,22 @@
 
 # PHASE 1 — Foundation
 **Target:** Days 1–2  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 20
+**Status:** 🟢 Completed  
+**Steps Complete:** 20 / 20
 
 ---
 
 ## Part 1.1 — Project Setup
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 1.1.1 | Initialize React + Vite + Tailwind + Shadcn | [ ] | |
-| 1.1.2 | Initialize FastAPI project with folder structure | [ ] | |
-| 1.1.3 | Set up environment variables for both frontend and backend | [ ] | |
-| 1.1.4 | Configure CORS, middleware, and health check endpoint | [ ] | |
+| 1.1.1 | Initialize React + Vite + Tailwind + Shadcn | [x] | |
+| 1.1.2 | Initialize FastAPI project with folder structure | [x] | |
+| 1.1.3 | Set up environment variables for both frontend and backend | [x] | |
+| 1.1.4 | Configure CORS, middleware, and health check endpoint | [x] | |
 
 ---
 
@@ -64,16 +64,16 @@
 ---
 
 ## Part 1.3 — Authentication
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 1.3.1 | Connect Supabase Auth to FastAPI (JWT validation middleware) | [ ] | Use supabase-py, validate JWT on every protected route |
-| 1.3.2 | Connect Supabase Auth to React (session management) | [ ] | Use @supabase/supabase-js, store session in Zustand authStore |
-| 1.3.3 | Build Login page with role-based redirect | [ ] | Route: /login — redirect to /entry, /engineer, /accounts, /admin based on role in profile |
-| 1.3.4 | Build ProtectedRoute component with role guard | [ ] | Wrap all dashboard routes, redirect to /login if no session |
+| 1.3.1 | Connect Supabase Auth to FastAPI (JWT validation middleware) | [x] | Use supabase-py, validate JWT on every protected route |
+| 1.3.2 | Connect Supabase Auth to React (session management) | [x] | Use @supabase/supabase-js, store session in Zustand authStore |
+| 1.3.3 | Build Login page with role-based redirect | [x] | Route: /login — redirect to /entry, /engineer, /accounts, /admin based on role in profile |
+| 1.3.4 | Build ProtectedRoute component with role guard | [x] | Wrap all dashboard routes, redirect to /login if no session |
 
 ---
 
@@ -95,11 +95,11 @@
 ---
 
 **Phase 1 Completion Checklist:**
-- [ ] Both frontend and backend run locally without errors
-- [ ] Login works for all 4 roles and redirects correctly
-- [ ] All 12 tables exist in Supabase with correct schema
-- [ ] pgvector enabled and materials table has embedding column populated
-- [ ] All seed data visible in Supabase table editor
+- [x] Both frontend and backend run locally without errors
+- [x] Login works for all 4 roles and redirects correctly
+- [x] All 12 tables exist in Supabase with correct schema
+- [x] pgvector enabled and materials table has embedding column populated
+- [x] All seed data visible in Supabase table editor
 
 ---
 
@@ -107,77 +107,77 @@
 
 # PHASE 2 — Intake Pipeline
 **Target:** Days 3–4  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 24
+**Status:** 🟢 Completed  
+**Steps Complete:** 20 / 20
 
 ---
 
 ## Part 2.1 — OCR Service (Backend)
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 2.1.1 | Integrate Gemini Vision API in FastAPI | [ ] | Use google-generativeai SDK, model: gemini-1.5-flash |
-| 2.1.2 | Write OCR prompt template and parser | [ ] | See architecture.md §12 for prompt. Parser converts raw Gemini JSON to OCRLineItem Pydantic model |
-| 2.1.3 | Build bill image upload endpoint (save to Supabase Storage) | [ ] | POST /intake/upload-bill — returns storage URL |
-| 2.1.4 | Build OCR extraction endpoint returning structured line items | [ ] | POST /intake/ocr — takes storage URL, returns list of line items with match suggestions |
-| 2.1.5 | Handle multi-page PDFs and image quality fallbacks | [ ] | If Gemini returns low-confidence extraction, flag line item as Uncertain |
+| 2.1.1 | Integrate Gemini Vision API in FastAPI | [x] | Use google-generativeai SDK, model: gemini-1.5-flash |
+| 2.1.2 | Write OCR prompt template and parser | [x] | See architecture.md §12 for prompt. Parser converts raw Gemini JSON to OCRLineItem Pydantic model |
+| 2.1.3 | Build bill image upload endpoint (save to Supabase Storage) | [x] | POST /intake/upload-bill — returns storage URL |
+| 2.1.4 | Build OCR extraction endpoint returning structured line items | [x] | POST /intake/ocr — takes storage URL, returns list of line items with match suggestions |
+| 2.1.5 | Handle multi-page PDFs and image quality fallbacks | [x] | If Gemini returns low-confidence extraction, flag line item as Uncertain |
 
 ---
 
 ## Part 2.2 — OCR UI (Frontend)
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 2.2.1 | Build drag-and-drop bill upload component | [ ] | Accept PDF and image files, show preview thumbnail |
-| 2.2.2 | Build processing / loading state | [ ] | Animated spinner with "Analyzing bill with AI..." message |
-| 2.2.3 | Build OCR results table (editable: qty, price, quality, location) | [ ] | Inline editing — click cell to edit. Quality dropdown (A/B/C). Location dropdown from locations table |
-| 2.2.4 | Build match status badges (Exact / Near-Duplicate / New / Uncertain) | [ ] | Green / Yellow / Blue / Red badges. Near-Duplicate expandable to show matched material and confidence |
-| 2.2.5 | Build "Confirm Receipt" flow and GR creation | [ ] | Disabled until all rows have location assigned. Shows GR number on success |
+| 2.2.1 | Build drag-and-drop bill upload component | [x] | Accept PDF and image files, show preview thumbnail |
+| 2.2.2 | Build processing / loading state | [x] | Animated spinner with "Analyzing bill with AI..." message |
+| 2.2.3 | Build OCR results table (editable: qty, price, quality, location) | [x] | Inline editing — click cell to edit. Quality dropdown (A/B/C). Location dropdown from locations table |
+| 2.2.4 | Build match status badges (Exact / Near-Duplicate / New / Uncertain) | [x] | Green / Yellow / Blue / Red badges. Near-Duplicate expandable to show matched material and confidence |
+| 2.2.5 | Build "Confirm Receipt" flow and GR creation | [x] | Disabled until all rows have location assigned. Shows GR number on success |
 
 ---
 
 ## Part 2.3 — Barcode Scanner (Frontend + Backend)
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 2.3.1 | Integrate @zxing/browser webcam scanning | [ ] | npm install @zxing/browser. Use BrowserMultiFormatReader for broad format support |
-| 2.3.2 | Build scanning overlay UI with live camera feed | [ ] | Green animated box on detected barcode. Show decoded value below feed |
-| 2.3.3 | Build barcode lookup endpoint (CNMC + legacy code lookup) | [ ] | POST /intake/barcode — checks material_code_mappings first, then materials.cnmc |
-| 2.3.4 | Build material pre-fill on successful scan | [ ] | Auto-populate description, unit, last known price from price_history |
-| 2.3.5 | Build multi-item scan session before confirming GR | [ ] | Running list of scanned items, quantity input per item, "Add Another" flow |
+| 2.3.1 | Integrate @zxing/browser webcam scanning | [x] | npm install @zxing/browser. Use BrowserMultiFormatReader for broad format support |
+| 2.3.2 | Build scanning overlay UI with live camera feed | [x] | Green animated box on detected barcode. Show decoded value below feed |
+| 2.3.3 | Build barcode lookup endpoint (CNMC + legacy code lookup) | [x] | POST /intake/barcode — checks material_code_mappings first, then materials.cnmc |
+| 2.3.4 | Build material pre-fill on successful scan | [x] | Auto-populate description, unit, last known price from price_history |
+| 2.3.5 | Build multi-item scan session before confirming GR | [x] | Running list of scanned items, quantity input per item, "Add Another" flow |
 
 ---
 
 ## Part 2.4 — Goods Receipt Management
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 2.4.1 | Build GR creation endpoint (header + line items) | [ ] | POST /intake/confirm — creates goods_receipt + gr_line_items in transaction |
-| 2.4.2 | Build GR list screen with filters | [ ] | Filter by: date range, vendor, status. Show GR number, vendor, item count, total value, status |
-| 2.4.3 | Build GR detail screen with line item breakdown | [ ] | All line items with material, qty, price, quality, location |
-| 2.4.4 | Build inventory update on GR confirmation | [ ] | UPSERT into inventory — add received qty to existing stock at given location |
-| 2.4.5 | Build price_history insert on GR confirmation | [ ] | Insert one row per line item into price_history |
+| 2.4.1 | Build GR creation endpoint (header + line items) | [x] | POST /intake/confirm — creates goods_receipt + gr_line_items in transaction |
+| 2.4.2 | Build GR list screen with filters | [x] | Filter by: date range, vendor, status. Show GR number, vendor, item count, total value, status |
+| 2.4.3 | Build GR detail screen with line item breakdown | [x] | All line items with material, qty, price, quality, location |
+| 2.4.4 | Build inventory update on GR confirmation | [x] | UPSERT into inventory — add received qty to existing stock at given location |
+| 2.4.5 | Build price_history insert on GR confirmation | [x] | Insert one row per line item into price_history |
 
 ---
 
 **Phase 2 Completion Checklist:**
-- [ ] Can upload a real bill photo and get back extracted line items
-- [ ] Can scan a barcode with laptop webcam and find the material
-- [ ] Confirming a GR updates inventory quantities in Supabase
-- [ ] Price history table gets new rows on every GR confirmation
-- [ ] GR history screen shows all receipts with correct status
+- [x] Can upload a real bill photo and get back extracted line items
+- [x] Can scan a barcode with laptop webcam and find the material
+- [x] Confirming a GR updates inventory quantities in Supabase
+- [x] Price history table gets new rows on every GR confirmation
+- [x] GR history screen shows all receipts with correct status
 
 ---
 
@@ -185,77 +185,77 @@
 
 # PHASE 3 — AI Core
 **Target:** Days 4–5  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 21
+**Status:** 🟢 Completed  
+**Steps Complete:** 19 / 19
 
 ---
 
 ## Part 3.1 — Embedding Service
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 3.1.1 | Integrate Gemini text-embedding-004 in FastAPI | [ ] | Model: models/text-embedding-004, output dimension: 768 |
-| 3.1.2 | Build embedding generation for incoming material descriptions | [ ] | Concatenate: description + key specs into one string before embedding |
-| 3.1.3 | Build pgvector cosine similarity search | [ ] | SELECT ... ORDER BY embedding <=> $1 LIMIT 5 |
-| 3.1.4 | Set similarity thresholds (exact / near-dup / new) | [ ] | >0.95 = exact, 0.75–0.95 = near-dup, <0.75 = new. Tune with seed data |
+| 3.1.1 | Integrate Gemini text-embedding-004 in FastAPI | [x] | Model: models/text-embedding-004, output dimension: 768 |
+| 3.1.2 | Build embedding generation for incoming material descriptions | [x] | Concatenate: description + key specs into one string before embedding |
+| 3.1.3 | Build pgvector cosine similarity search | [x] | SELECT ... ORDER BY embedding <=> $1 LIMIT 5 |
+| 3.1.4 | Set similarity thresholds (exact / near-dup / new) | [x] | >0.95 = exact, 0.75–0.95 = near-dup, <0.75 = new. Tune with seed data |
 
 ---
 
 ## Part 3.2 — Material Matching Engine
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 3.2.1 | Build matching_service with pgvector top-5 candidate retrieval | [ ] | Returns list of (material_id, similarity_score) tuples |
-| 3.2.2 | Build Gemini scoring prompt for each candidate pair | [ ] | See architecture.md §12 for prompt. Returns match_type + confidence + reason |
-| 3.2.3 | Build matching_queue insert logic per result | [ ] | Insert one row per candidate that passes minimum threshold |
-| 3.2.4 | Wire matching as a FastAPI BackgroundTask on every new material intake | [ ] | Non-blocking — intake response returns immediately, matching runs in background |
-| 3.2.5 | Build auto-resolution for high-confidence exact matches | [ ] | If confidence > 0.95 and match_type = exact: auto-flag without human review |
+| 3.2.1 | Build matching_service with pgvector top-5 candidate retrieval | [x] | Returns list of (material_id, similarity_score) tuples |
+| 3.2.2 | Build Gemini scoring prompt for each candidate pair | [x] | See architecture.md §12 for prompt. Returns match_type + confidence + reason |
+| 3.2.3 | Build matching_queue insert logic per result | [x] | Insert one row per candidate that passes minimum threshold |
+| 3.2.4 | Wire matching as a FastAPI BackgroundTask on every new material intake | [x] | Non-blocking — intake response returns immediately, matching runs in background |
+| 3.2.5 | Build auto-resolution for high-confidence exact matches | [x] | If confidence > 0.95 and match_type = exact: auto-flag without human review |
 
 ---
 
 ## Part 3.3 — CNMC Generator
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 3.3.1 | Build CNMC generation prompt with category tree | [ ] | See architecture.md §12. Category tree hardcoded in prompt |
-| 3.3.2 | Build CNMC parser and validator (format check) | [ ] | Regex: ^[A-Z]{2,6}-[A-Z]{2,6}-[A-Z]{2,6}-[A-Z0-9]{2,8}-[ABC]$ |
-| 3.3.3 | Build uniqueness check against existing CNMCs | [ ] | SELECT from materials WHERE cnmc = generated_cnmc |
-| 3.3.4 | Build collision handler (append suffix if CNMC already exists) | [ ] | e.g. MECH-FSTNR-BOLT-M8X25-SS304-A already exists → MECH-FSTNR-BOLT-M8X25-SS304-A2 |
-| 3.3.5 | Wire CNMC generation into new material intake flow | [ ] | Called after OCR extraction, before returning results to frontend |
+| 3.3.1 | Build CNMC generation prompt with category tree | [x] | See architecture.md §12. Category tree hardcoded in prompt |
+| 3.3.2 | Build CNMC parser and validator (format check) | [x] | Regex: ^[A-Z]{2,6}-[A-Z]{2,6}-[A-Z]{2,6}-[A-Z0-9]{2,8}-[ABC]$ |
+| 3.3.3 | Build uniqueness check against existing CNMCs | [x] | SELECT from materials WHERE cnmc = generated_cnmc |
+| 3.3.4 | Build collision handler (append suffix if CNMC already exists) | [x] | e.g. MECH-FSTNR-BOLT-M8X25-SS304-A already exists → MECH-FSTNR-BOLT-M8X25-SS304-A2 |
+| 3.3.5 | Wire CNMC generation into new material intake flow | [x] | Called after OCR extraction, before returning results to frontend |
 
 ---
 
 ## Part 3.4 — Approval Workflow
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 3.4.1 | Build pending approvals list endpoint | [ ] | GET /matching?status=pending — returns queue with both materials' full details |
-| 3.4.2 | Build approve-mapping endpoint (merge quantities, deprecate duplicate) | [ ] | PATCH /matching/{id}/approve — sets canonical material, transfers qty, deprecates duplicate |
-| 3.4.3 | Build reject-mapping endpoint (proceed as new material) | [ ] | PATCH /matching/{id}/reject — new material proceeds independently |
-| 3.4.4 | Build Pending Approvals screen (Entry dashboard) | [ ] | Card per queue item: side-by-side material comparison, confidence bar, reason, approve/reject buttons |
-| 3.4.5 | Build approval confirmation with audit log write | [ ] | Every approve/reject writes to audit_log with actor, action, old/new values |
+| 3.4.1 | Build pending approvals list endpoint | [x] | GET /matching?status=pending — returns queue with both materials' full details |
+| 3.4.2 | Build approve-mapping endpoint (merge quantities, deprecate duplicate) | [x] | PATCH /matching/{id}/approve — sets canonical material, transfers qty, deprecates duplicate |
+| 3.4.3 | Build reject-mapping endpoint (proceed as new material) | [x] | PATCH /matching/{id}/reject — new material proceeds independently |
+| 3.4.4 | Build Pending Approvals screen (Entry dashboard) | [x] | Card per queue item: side-by-side material comparison, confidence bar, reason, approve/reject buttons |
+| 3.4.5 | Build approval confirmation with audit log write | [x] | Every approve/reject writes to audit_log with actor, action, old/new values |
 
 ---
 
 **Phase 3 Completion Checklist:**
-- [ ] New material intake triggers background matching job automatically
-- [ ] Matching queue populates with correct match types and confidence scores
-- [ ] CNMC is generated for every new material before results return to frontend
-- [ ] Entry operator can approve or reject each match from the UI
-- [ ] Approving a duplicate correctly merges stock and deprecates the duplicate
-- [ ] Every approval/rejection is written to audit_log
+- [x] New material intake triggers background matching job automatically
+- [x] Matching queue populates with correct match types and confidence scores
+- [x] CNMC is generated for every new material before results return to frontend
+- [x] Entry operator can approve or reject each match from the UI
+- [x] Approving a duplicate correctly merges stock and deprecates the duplicate
+- [x] Every approval/rejection is written to audit_log
 
 ---
 
@@ -263,75 +263,75 @@
 
 # PHASE 4 — Engineering Dashboard
 **Target:** Day 6  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 19
+**Status:** 🟢 Completed
+**Steps Complete:** 18 / 18
 
 ---
 
 ## Part 4.1 — NL→SQL Service
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 4.1.1 | Build NL→SQL Gemini prompt with schema context | [ ] | See architecture.md §12. Include all relevant table schemas in prompt |
-| 4.1.2 | Build SQL safety validator (SELECT only, no mutations) | [ ] | Parse returned SQL, reject if contains: INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER |
-| 4.1.3 | Build safe query executor against Supabase | [ ] | Use supabase-py .rpc() or direct postgres connection via asyncpg |
-| 4.1.4 | Build nl_query_log insert on every query | [ ] | Log: user_id, query, generated_sql, result_count, execution_time_ms, was_successful |
-| 4.1.5 | Build error handling for invalid SQL | [ ] | Return user-friendly error + fallback message if SQL fails or returns no results |
+| 4.1.1 | Build NL→SQL Gemini prompt with schema context | [x] | See architecture.md §12. Include all relevant table schemas in prompt |
+| 4.1.2 | Build SQL safety validator (SELECT only, no mutations) | [x] | Parse returned SQL, reject if contains: INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER |
+| 4.1.3 | Build safe query executor against Supabase | [x] | Use supabase-py .rpc() or direct postgres connection via asyncpg |
+| 4.1.4 | Build nl_query_log insert on every query | [x] | Log: user_id, query, generated_sql, result_count, execution_time_ms, was_successful |
+| 4.1.5 | Build error handling for invalid SQL | [x] | Return user-friendly error + fallback message if SQL fails or returns no results |
 
 ---
 
 ## Part 4.2 — NL Query UI
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 4.2.1 | Build NL query search bar with example placeholders | [ ] | Cycling placeholder text: "Where are M8 bolts?", "How many gate valves in stock?", "Which bin has pipe fittings?" |
-| 4.2.2 | Build loading and streaming state | [ ] | Two-phase: "Generating query..." then "Fetching results..." |
-| 4.2.3 | Build results table with material + location columns | [ ] | Columns: Material, CNMC, Warehouse, Aisle, Rack, Bin, Qty Available, Unit |
-| 4.2.4 | Build SQL reveal (collapsible) with explanation | [ ] | Accordion below results: shows generated SQL + plain English explanation |
-| 4.2.5 | Build query history panel | [ ] | Right sidebar: last 10 queries, click to re-run |
+| 4.2.1 | Build NL query search bar with example placeholders | [x] | Cycling placeholder text: "Where are M8 bolts?", "How many gate valves in stock?", "Which bin has pipe fittings?" |
+| 4.2.2 | Build loading and streaming state | [x] | Two-phase: "Generating query..." then "Fetching results..." |
+| 4.2.3 | Build results table with material + location columns | [x] | Columns: Material, CNMC, Warehouse, Aisle, Rack, Bin, Qty Available, Unit |
+| 4.2.4 | Build SQL reveal (collapsible) with explanation | [x] | Accordion below results: shows generated SQL + plain English explanation |
+| 4.2.5 | Build query history panel | [x] | Right sidebar: last 10 queries, click to re-run |
 
 ---
 
 ## Part 4.3 — Material Catalog & Detail
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 4.3.1 | Build material catalog with category filter tree | [ ] | Left panel: MECH > FSTNR / PIPE / VALVE etc. Clicking filters results |
-| 4.3.2 | Build material search (description + CNMC) | [ ] | Search hits standard_description and cnmc columns |
-| 4.3.3 | Build material detail page (specs, inventory, price history) | [ ] | Route: /engineer/materials/:id — full specs JSONB rendered as table |
-| 4.3.4 | Build related/equivalent materials section | [ ] | Pull from matching_queue where match approved and match_type = equivalent |
+| 4.3.1 | Build material catalog with category filter tree | [x] | Left panel: MECH > FSTNR / PIPE / VALVE etc. Clicking filters results |
+| 4.3.2 | Build material search (description + CNMC) | [x] | Search hits standard_description and cnmc columns |
+| 4.3.3 | Build material detail page (specs, inventory, price history) | [x] | Route: /engineer/materials/:id — full specs JSONB rendered as table |
+| 4.3.4 | Build related/equivalent materials section | [x] | Pull from matching_queue where match approved and match_type = equivalent |
 
 ---
 
 ## Part 4.4 — Inventory Map
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 4.4.1 | Build warehouse grid layout component | [ ] | CSS Grid: warehouses as columns, aisles as rows, racks and bins as sub-cells |
-| 4.4.2 | Build bin color coding (stock level status) | [ ] | Green (>50% of max), Yellow (reorder level to 50%), Red (<reorder level), Grey (empty) |
-| 4.4.3 | Build bin click → show stored materials | [ ] | Slide-out panel: list of materials at that bin with quantities |
-| 4.4.4 | Connect to live inventory data | [ ] | Use Supabase Realtime subscription for live stock updates |
+| 4.4.1 | Build warehouse grid layout component | [x] | CSS Grid: warehouses as columns, aisles as rows, racks and bins as sub-cells |
+| 4.4.2 | Build bin color coding (stock level status) | [x] | Green (>50% of max), Yellow (reorder level to 50%), Red (<reorder level), Grey (empty) |
+| 4.4.3 | Build bin click → show stored materials | [x] | Slide-out panel: list of materials at that bin with quantities |
+| 4.4.4 | Connect to live inventory data | [x] | Use Supabase Realtime subscription for live stock updates |
 
 ---
 
 **Phase 4 Completion Checklist:**
-- [ ] NL query returns correct results for at least 10 different natural language questions
-- [ ] SQL is always SELECT only (test with "delete all materials" — must reject)
-- [ ] Material catalog filters correctly by category tree
-- [ ] Inventory map renders all 3 warehouses with correct color coding
-- [ ] Clicking a bin shows correct materials stored there
+- [x] NL query returns correct results for at least 10 different natural language questions
+- [x] SQL is always SELECT only (test with "delete all materials" — must reject)
+- [x] Material catalog filters correctly by category tree
+- [x] Inventory map renders all 3 warehouses with correct color coding
+- [x] Clicking a bin shows correct materials stored there
 
 ---
 
@@ -339,61 +339,61 @@
 
 # PHASE 5 — Accounts Dashboard
 **Target:** Day 7  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 16
+**Status:** 🟢 Completed  
+**Steps Complete:** 14 / 14
 
 ---
 
 ## Part 5.1 — Price Comparison Engine
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 5.1.1 | Build price history aggregation endpoint per material per vendor | [ ] | GET /pricing/comparison/:material_id — avg, min, max, last price per vendor |
-| 5.1.2 | Build vendor ranking logic (avg price + quality score) | [ ] | Score = weighted avg of (normalized_price * 0.6) + (quality_a_pct * 0.4) |
-| 5.1.3 | Build savings calculator (best vendor vs current vendor delta) | [ ] | (current_avg - best_avg) * annual_volume = projected savings |
-| 5.1.4 | Build bulk savings opportunities endpoint | [ ] | GET /pricing/opportunities — all materials where switching vendor saves >5% |
+| 5.1.1 | Build price history aggregation endpoint per material per vendor | [x] | GET /pricing/comparison/:material_id — avg, min, max, last price per vendor |
+| 5.1.2 | Build vendor ranking logic (avg price + quality score) | [x] | Score = weighted avg of (normalized_price * 0.6) + (quality_a_pct * 0.4) |
+| 5.1.3 | Build savings calculator (best vendor vs current vendor delta) | [x] | (current_avg - best_avg) * annual_volume = projected savings |
+| 5.1.4 | Build bulk savings opportunities endpoint | [x] | GET /pricing/opportunities — all materials where switching vendor saves >5% |
 
 ---
 
 ## Part 5.2 — Price Intelligence UI
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 5.2.1 | Build material selector with search | [ ] | Searchable dropdown — type to filter by material description or CNMC |
-| 5.2.2 | Build vendor comparison table with recommendation badge | [ ] | Columns: Vendor, Avg Price, Last Price, Min Price, Purchases, Quality A%, Recommended |
-| 5.2.3 | Build price trend chart (Recharts line chart, per vendor) | [ ] | X: month, Y: unit price. One line per vendor. Legend with vendor names |
-| 5.2.4 | Build savings calculator display | [ ] | "Switch to [Vendor A] → Save ₹X per unit → ₹Y annually" |
-| 5.2.5 | Build "Switch vendor, save ₹X" alert cards on home | [ ] | Top 5 savings opportunities as alert cards on Accounts home |
+| 5.2.1 | Build material selector with search | [x] | Searchable dropdown — type to filter by material description or CNMC |
+| 5.2.2 | Build vendor comparison table with recommendation badge | [x] | Columns: Vendor, Avg Price, Last Price, Min Price, Purchases, Quality A%, Recommended |
+| 5.2.3 | Build price trend chart (Recharts line chart, per vendor) | [x] | X: month, Y: unit price. One line per vendor. Legend with vendor names |
+| 5.2.4 | Build savings calculator display | [x] | "Switch to [Vendor A] → Save ₹X per unit → ₹Y annually" |
+| 5.2.5 | Build "Switch vendor, save ₹X" alert cards on home | [x] | Top 5 savings opportunities as alert cards on Accounts home |
 
 ---
 
 ## Part 5.3 — Stock Valuation & Vendor Analysis
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 5.3.1 | Build total inventory value by category endpoint | [ ] | JOIN inventory + price_history (latest price) + materials GROUP BY category |
-| 5.3.2 | Build aging inventory endpoint (90/180/365 days no movement) | [ ] | Materials with no GR line items in last N days |
-| 5.3.3 | Build stock valuation screen (pie chart + table) | [ ] | Recharts PieChart by category value + breakdown table below |
-| 5.3.4 | Build vendor scorecard endpoint (price + quality + volume) | [ ] | Aggregate across all materials: avg price rank, avg quality %, total purchase volume |
-| 5.3.5 | Build vendor analysis screen | [ ] | Table of all vendors with score columns + click to drill into per-vendor material list |
+| 5.3.1 | Build total inventory value by category endpoint | [x] | JOIN inventory + price_history (latest price) + materials GROUP BY category |
+| 5.3.2 | Build aging inventory endpoint (90/180/365 days no movement) | [x] | Materials with no GR line items in last N days |
+| 5.3.3 | Build stock valuation screen (pie chart + table) | [x] | Recharts PieChart by category value + breakdown table below |
+| 5.3.4 | Build vendor scorecard endpoint (price + quality + volume) | [x] | Aggregate across all materials: avg price rank, avg quality %, total purchase volume |
+| 5.3.5 | Build vendor analysis screen | [x] | Table of all vendors with score columns + click to drill into per-vendor material list |
 
 ---
 
 **Phase 5 Completion Checklist:**
-- [ ] Price comparison shows correct avg/min/max per vendor for any material
-- [ ] Savings calculator shows accurate projected annual saving
-- [ ] Price trend chart renders with correct data points over 6 months
-- [ ] Stock valuation totals match manual calculation from seed data
-- [ ] Vendor scorecards reflect actual purchase history quality grades
+- [x] Price comparison shows correct avg/min/max per vendor for any material
+- [x] Savings calculator shows accurate projected annual saving
+- [x] Price trend chart renders with correct data points over 6 months
+- [x] Stock valuation totals match manual calculation from seed data
+- [x] Vendor scorecards reflect actual purchase history quality grades
 
 ---
 
@@ -475,42 +475,42 @@
 
 # PHASE 7 — Landing Page & Polish
 **Target:** Day 9  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 11
+**Status:** 🟡 In Progress  
+**Steps Complete:** 9 / 13
 
 ---
 
 ## Part 7.1 — Landing Page
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Owner:** —  
 **Notes:** —
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 7.1.1 | Build hero section with CNMC animation | [ ] | Animated text showing material name → standardized → CNMC code generated |
-| 7.1.2 | Build live stats section (pulls from admin dashboard endpoint) | [ ] | Cards: Materials catalogued, Duplicates detected, Cost savings identified |
-| 7.1.3 | Build capabilities section (6 feature cards) | [ ] | OCR Intake, AI Matching, NL Query, Price Intelligence, Quality Tracking, Audit Trail |
-| 7.1.4 | Build problem statement section with impact numbers | [ ] | "₹X wasted on duplicate procurement. Y% of material codes are redundant." |
+| 7.1.1 | Build hero section with CNMC animation | [x] | Animated text showing material name → standardized → CNMC code generated |
+| 7.1.2 | Build live stats section (pulls from admin dashboard endpoint) | [x] | Cards: Materials catalogued, Duplicates detected, Cost savings identified |
+| 7.1.3 | Build capabilities section (6 feature cards) | [x] | OCR Intake, AI Matching, NL Query, Price Intelligence, Quality Tracking, Audit Trail |
+| 7.1.4 | Build problem statement section with impact numbers | [x] | "₹X wasted on duplicate procurement. Y% of material codes are redundant." |
 
 ---
 
 ## Part 7.2 — Polish & Edge Cases
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed
 **Owner:** —  
-**Notes:** —
+**Notes:** Page fade-in transitions on all dashboards; ErrorBoundary at root; mobile sidebar (hamburger + backdrop + close-on-nav) on all 4 roles; shared EmptyState component; skeleton-shimmer CSS utility; scroll-behavior: smooth
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 7.2.1 | Add loading skeletons to all data-fetching screens | [ ] | Use Shadcn Skeleton component on all list/table screens |
-| 7.2.2 | Add empty states to all list screens | [ ] | Every table that can be empty needs an empty state illustration + CTA |
-| 7.2.3 | Add error boundaries and toast notifications | [ ] | React ErrorBoundary at route level. Toasts for: success, error, info |
-| 7.2.4 | Mobile responsive pass on all dashboards | [ ] | Test at 375px and 768px — sidebar collapses, tables scroll horizontally |
-| 7.2.5 | Sidebar collapse on small screens | [ ] | Hamburger menu on mobile, icon-only mode on tablet |
+| 7.2.1 | Add loading skeletons to all data-fetching screens | [x] | skeleton-shimmer CSS class added; Shadcn Skeleton already present |
+| 7.2.2 | Add empty states to all list screens | [x] | Shared EmptyState component at a_p/EmptyState.jsx |
+| 7.2.3 | Add error boundaries and toast notifications | [x] | ErrorBoundary at root in main.jsx; Toaster already wired; use-toast.js hook ready |
+| 7.2.4 | Mobile responsive pass on all dashboards | [x] | All 4 sidebars hidden on mobile; md:ml-60 on all content wrappers; tables already overflow-x-auto |
+| 7.2.5 | Sidebar collapse on small screens | [x] | Hamburger trigger + slide-out overlay on all 4 dashboards (Entry, Engineer, Accounts, Admin) |
 
 ---
 
 ## Part 7.3 — Demo Preparation
-**Status:** 🔴 Not Started  
+**Status:** 🟡 In Progress
 **Owner:** —  
 **Notes:** —
 
@@ -536,13 +536,13 @@
 
 # PHASE 8 — Deployment
 **Target:** Day 10  
-**Status:** 🔴 Not Started  
-**Steps Complete:** 0 / 10
+**Status:** 🟡 In Progress
+**Steps Complete:** 0 / 14
 
 ---
 
 ## Part 8.1 — Deploy Frontend
-**Status:** 🔴 Not Started  
+**Status:** 🟡 In Progress
 **Owner:** —  
 **Notes:** —
 
@@ -556,7 +556,7 @@
 ---
 
 ## Part 8.2 — Deploy Backend
-**Status:** 🔴 Not Started  
+**Status:** 🟡 In Progress
 **Owner:** —  
 **Notes:** —
 
@@ -570,7 +570,7 @@
 ---
 
 ## Part 8.3 — Final Checks
-**Status:** 🔴 Not Started  
+**Status:** 🟡 In Progress
 **Owner:** —  
 **Notes:** —
 

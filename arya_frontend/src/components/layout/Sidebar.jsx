@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Droplets, Home, FileText, CheckCircle2, History, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Droplets, Home, FileText, CheckCircle2, History, MapPin, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -13,12 +13,36 @@ const navItems = [
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  // Close on navigation
+  React.useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   return (
-    <aside className={cn(
-      'fixed left-0 top-0 h-full bg-slate-900 text-white flex flex-col transition-all duration-300 z-40',
-      collapsed ? 'w-16' : 'w-60'
-    )}>
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div className="sidebar-backdrop md:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+      {/* Floating hamburger trigger — mobile only, only when sidebar is closed */}
+      {!mobileOpen && (
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-slate-900 text-white shadow-lg"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
+      <aside className={cn(
+        'fixed left-0 top-0 h-full bg-slate-900 text-white flex flex-col transition-all duration-300 z-40',
+        // Mobile
+        'max-md:translate-x-[-100%] max-md:w-72',
+        mobileOpen && 'max-md:translate-x-0',
+        // Desktop collapsible
+        collapsed ? 'md:w-16' : 'md:w-60'
+      )}>
       {/* Logo */}
       <div className={cn('flex items-center gap-2 px-4 py-5 border-b border-slate-700', collapsed && 'justify-center px-2')}>
         <Droplets className="h-7 w-7 text-blue-400 shrink-0" />
@@ -63,5 +87,6 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

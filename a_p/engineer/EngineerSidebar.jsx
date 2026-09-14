@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Droplets, Home, TrendingDown, Package, Users, History, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useSidebar } from './SidebarContext';
+import { useSidebar } from '../SidebarContext';
+import {
+  Wrench,
+  Home,
+  MessageSquare,
+  BookOpen,
+  Map,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
 const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const navItems = [
-  { to: '/accounts', label: 'Home', icon: Home, end: true },
-  { to: '/accounts/price-intelligence', label: 'Price Intelligence', icon: TrendingDown },
-  { to: '/accounts/stock-valuation', label: 'Stock Valuation', icon: Package },
-  { to: '/accounts/vendor-analysis', label: 'Vendor Analysis', icon: Users },
-  { to: '/accounts/purchase-history', label: 'Purchase History', icon: History },
+  { to: '/engineer', label: 'Home', icon: Home, end: true },
+  { to: '/engineer/nl-query', label: 'NL Query', icon: MessageSquare },
+  { to: '/engineer/catalog', label: 'Material Catalog', icon: BookOpen },
+  { to: '/engineer/inventory-map', label: 'Inventory Map', icon: Map },
 ];
 
-export default function AccountsSidebar() {
+export default function EngineerSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { mobileOpen, close } = useSidebar();
   const location = useLocation();
@@ -33,11 +40,11 @@ export default function AccountsSidebar() {
       )}>
       {/* Logo */}
       <div className={cn('flex items-center gap-2 px-4 py-5 border-b border-slate-700', collapsed && 'justify-center px-2')}>
-        <Droplets className="h-7 w-7 text-blue-400 shrink-0" />
+        <Wrench className="h-7 w-7 text-teal-400 shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
             <div className="font-bold text-lg leading-tight">NUMM</div>
-            <div className="text-xs text-slate-400 leading-tight">BharatOil Accounts</div>
+            <div className="text-xs text-slate-400 leading-tight">BharatOil Engineering</div>
           </div>
         )}
       </div>
@@ -52,7 +59,7 @@ export default function AccountsSidebar() {
             className={({ isActive }) => cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
               isActive
-                ? 'bg-blue-600 text-white'
+                ? 'bg-teal-600 text-white'
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white',
               collapsed && 'justify-center px-2'
             )}

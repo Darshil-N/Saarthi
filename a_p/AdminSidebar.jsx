@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useSidebar } from './SidebarContext';
 import { 
   Shield, 
   Home, 
@@ -24,12 +25,26 @@ const navItems = [
 
 export default function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { mobileOpen, close } = useSidebar();
+  const location = useLocation();
+
+  // Close mobile sidebar on navigation
+  React.useEffect(() => { close(); }, [location.pathname]);
 
   return (
-    <aside className={cn(
-      'fixed left-0 top-0 h-full bg-slate-900 text-white flex flex-col transition-all duration-300 z-40',
-      collapsed ? 'w-16' : 'w-60'
-    )}>
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div className="sidebar-backdrop md:hidden" onClick={close} />
+      )}
+      <aside className={cn(
+        'fixed left-0 top-0 h-full bg-slate-900 text-white flex flex-col transition-all duration-300 z-40',
+        // Mobile: slide in/out
+        'max-md:translate-x-[-100%] max-md:w-72',
+        mobileOpen && 'max-md:translate-x-0',
+        // Desktop: collapsible
+        collapsed ? 'md:w-16' : 'md:w-60'
+      )}>
       {/* Logo */}
       <div className={cn('flex items-center gap-2 px-4 py-5 border-b border-slate-700', collapsed && 'justify-center px-2')}>
         <Shield className="h-7 w-7 text-indigo-400 shrink-0" />
@@ -74,5 +89,6 @@ export default function AdminSidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

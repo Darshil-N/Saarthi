@@ -8,7 +8,12 @@ import EntryHome from './pages/entry/EntryHome';
 import NewReceipt from './pages/entry/NewReceipt';
 import PendingApprovals from './pages/entry/PendingApprovals';
 import ReceiptHistory from './pages/entry/ReceiptHistory';
-import { Locations, EngineerDashboard } from './pages/Stubs';
+import { Locations } from './pages/Stubs';
+import EngineerDashboard from '../../a_p/engineer/EngineerDashboard';
+import EngineerHome from '../../a_p/engineer/EngineerHome';
+import NLQuery from '../../a_p/engineer/NLQuery';
+import MaterialCatalog from '../../a_p/engineer/MaterialCatalog';
+import InventoryMap from '../../a_p/engineer/InventoryMap';
 import AccountsDashboard from '../../a_p/AccountsDashboard';
 import AccountsHome from '../../a_p/pages/AccountsHome';
 import PriceIntelligence from '../../a_p/pages/PriceIntelligence';
@@ -43,7 +48,12 @@ function App() {
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="engineer" />}>
-        <Route path="/engineer" element={<EngineerDashboard />} />
+        <Route path="/engineer" element={<EngineerDashboard />}>
+          <Route index element={<EngineerHome />} />
+          <Route path="nl-query" element={<NLQuery />} />
+          <Route path="catalog" element={<MaterialCatalog />} />
+          <Route path="inventory-map" element={<InventoryMap />} />
+        </Route>
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="accounts" />}>
