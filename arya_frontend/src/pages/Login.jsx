@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Droplets, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -21,30 +22,29 @@ export default function Login() {
     setError('');
 
     try {
-      // Mock login process since Supabase isn't connected yet
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      if (!email || !password) {
-        throw new Error('Please enter both email and password.');
-      }
+      // Call real backend POST /auth/login
+      const { data } = await api.post('/auth/login', { email, password });
 
-      // Hardcode the user as an entry operator for local testing
-      const mockSession = { access_token: 'mock-jwt-token' };
-      const mockUser = { full_name: 'Test Operator' };
-      const mockRole = 'entry_operator';
+      // data = { access_token, token_type, role, user_id, email }
+      const session = { access_token: data.access_token };
+      const user = { full_name: data.email, id: data.user_id, email: data.email };
+      const role = data.role;
 
-      // Persist to local storage for our mock useAuth hook
-      localStorage.setItem('mock_auth', JSON.stringify({ 
-        session: mockSession, 
-        user: mockUser, 
-        role: mockRole 
-      }));
+      // Persist for the api.js interceptor
+      localStorage.setItem('mock_auth', JSON.stringify({ session, user, role }));
 
-      login(mockSession, mockUser, mockRole);
-      navigate('/entry');
+      login(session, user, role);
+
+      // Route by role
+      if (role === 'entry_operator') navigate('/entry');
+      else if (role === 'engineer') navigate('/engineer');
+      else if (role === 'accounts') navigate('/accounts');
+      else if (role === 'admin') navigate('/admin');
+      else navigate('/entry');
 
     } catch (err) {
-      setError(err.message || 'Failed to sign in. Please check your credentials.');
+      const msg = err?.response?.data?.detail || err.message || 'Failed to sign in. Please check your credentials.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,7 @@ export default function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="test@bharatoil.com"
+                  placeholder="operator@bharatoil.com"
                 />
               </div>
             </div>
@@ -101,7 +101,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pr-10"
-                  placeholder="Any password works"
+                  placeholder="Your password"
                 />
                 <button
                   type="button"
@@ -120,16 +120,10 @@ export default function Login() {
             <div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {loading ? 'Signing in...' : 'Sign In (Mock)'}
+                {loading ? 'Signing in...' : 'Sign In'}
               </Button>
             </div>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-xs text-slate-500">
-              Dev Mode: Any email/password will log you in as Entry Operator.
-            </p>
-          </div>
         </div>
       </div>
     </div>

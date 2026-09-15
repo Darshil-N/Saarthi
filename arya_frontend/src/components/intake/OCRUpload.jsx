@@ -48,7 +48,7 @@ export default function OCRUpload() {
     }
     
     const formData = new FormData();
-    formData.append('bill_image', file);
+    formData.append('file', file);
     formData.append('vendor_id', vendor_id);
     
     ocrMutation.mutate(formData);

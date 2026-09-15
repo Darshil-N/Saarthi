@@ -35,7 +35,7 @@ export function useOCRUpload() {
 export function useBarcodeIntake() {
   return useMutation({
     mutationFn: async ({ barcode }) => {
-      const { data } = await api.post('/intake/barcode', { barcode });
+      const { data } = await api.post('/intake/barcode', { code: barcode });
       return data;
     }
   });

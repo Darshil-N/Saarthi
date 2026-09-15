@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,10 +6,12 @@ import { useIntakeStore } from '@/store/intakeStore';
 import MatchStatusBadge from '@/components/intake/MatchStatusBadge';
 import CNMCBadge from '@/components/materials/CNMCBadge';
 import { cn } from '@/lib/utils';
+import { useLocations } from '@/hooks/useMaterials';
 
 export default function LineItemEditor({ item, index, readOnly = false }) {
   const updateLineItem = useIntakeStore((s) => s.updateLineItem);
   const removeLineItem = useIntakeStore((s) => s.removeLineItem);
+  const { data: locations = [] } = useLocations();
 
   const set = (field, value) => updateLineItem(item.line_id, { [field]: value });
 
@@ -18,10 +20,8 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
 
   return (
     <tr className="border-b hover:bg-slate-50 text-sm align-top">
-      {/* # */}
       <td className="px-3 py-2 text-slate-500 w-8">{index + 1}</td>
 
-      {/* Description */}
       <td className="px-3 py-2 min-w-[180px]">
         {readOnly ? (
           <span className="text-slate-800">{item.description}</span>
@@ -39,7 +39,6 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         )}
       </td>
 
-      {/* Qty */}
       <td className="px-3 py-2 w-20">
         {readOnly ? (
           <span>{item.quantity}</span>
@@ -53,7 +52,6 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         )}
       </td>
 
-      {/* UoM */}
       <td className="px-3 py-2 w-16">
         {readOnly ? (
           <span>{item.unit}</span>
@@ -66,7 +64,6 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         )}
       </td>
 
-      {/* Unit Price */}
       <td className="px-3 py-2 w-28">
         {readOnly ? (
           <span>₹{item.unit_price?.toFixed(2)}</span>
@@ -80,7 +77,6 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         )}
       </td>
 
-      {/* CNMC */}
       <td className="px-3 py-2">
         <CNMCBadge
           cnmc={item.cnmc}
@@ -90,7 +86,6 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         />
       </td>
 
-      {/* Status */}
       <td className="px-3 py-2">
         <MatchStatusBadge
           match_status={item.match_status}
@@ -99,7 +94,6 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         />
       </td>
 
-      {/* Quality */}
       <td className="px-3 py-2 w-24">
         {readOnly ? (
           <span className={cn(
@@ -125,21 +119,28 @@ export default function LineItemEditor({ item, index, readOnly = false }) {
         )}
       </td>
 
-      {/* Location */}
       <td className="px-3 py-2 min-w-[140px]">
         {readOnly ? (
           <span className="font-mono text-xs">{item.location_code}</span>
         ) : (
-          <Input
+          <Select
             value={item.location_code || ''}
-            onChange={(e) => set('location_code', e.target.value)}
-            placeholder="WHSE-A-A1-R1"
-            className={cn('h-8 text-xs', locationMissing && 'border-red-400')}
-          />
+            onValueChange={(val) => set('location_code', val)}
+          >
+            <SelectTrigger className={cn('h-8 text-xs', locationMissing && 'border-red-400')}>
+              <SelectValue placeholder="Select Location" />
+            </SelectTrigger>
+            <SelectContent>
+              {locations.map((loc) => (
+                <SelectItem key={loc.code} value={loc.code}>
+                  {loc.code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </td>
 
-      {/* Actions */}
       {!readOnly && (
         <td className="px-3 py-2 w-10">
           <button
