@@ -1,55 +1,57 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Droplets, Home, FileText, CheckCircle2, History, MapPin, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useSidebar } from './SidebarContext';
+import { 
+  Shield, 
+  Home, 
+  Database, 
+  Activity, 
+  Users, 
+  Copy, 
+  ChevronLeft, 
+  ChevronRight 
+} from 'lucide-react';
+
+const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const navItems = [
-  { to: '/entry', label: 'Home', icon: Home, end: true },
-  { to: '/entry/new-receipt', label: 'New Receipt', icon: FileText },
-  { to: '/entry/approvals', label: 'Pending Approvals', icon: CheckCircle2 },
-  { to: '/entry/history', label: 'Receipt History', icon: History },
-  { to: '/entry/locations', label: 'Locations', icon: MapPin },
+  { to: '/admin', label: 'Home', icon: Home, end: true },
+  { to: '/admin/material-governance', label: 'Material Governance', icon: Database },
+  { to: '/admin/audit-trail', label: 'Audit Trail', icon: Activity },
+  { to: '/admin/duplicate-detection', label: 'Duplicate Detection', icon: Copy },
+  { to: '/admin/user-management', label: 'User Management', icon: Users },
+  { to: '/admin/system-health', label: 'System Health', icon: Shield },
 ];
 
-export default function Sidebar() {
+export default function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { mobileOpen, close } = useSidebar();
   const location = useLocation();
 
-  // Close on navigation
-  React.useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+  // Close mobile sidebar on navigation
+  React.useEffect(() => { close(); }, [location.pathname]);
 
   return (
     <>
       {/* Mobile backdrop */}
       {mobileOpen && (
-        <div className="sidebar-backdrop md:hidden" onClick={() => setMobileOpen(false)} />
-      )}
-      {/* Floating hamburger trigger — mobile only, only when sidebar is closed */}
-      {!mobileOpen && (
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-slate-900 text-white shadow-lg"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="sidebar-backdrop md:hidden" onClick={close} />
       )}
       <aside className={cn(
         'fixed left-0 top-0 h-full bg-slate-900 text-white flex flex-col transition-all duration-300 z-40',
-        // Mobile
+        // Mobile: slide in/out
         'max-md:translate-x-[-100%] max-md:w-72',
         mobileOpen && 'max-md:translate-x-0',
-        // Desktop collapsible
+        // Desktop: collapsible
         collapsed ? 'md:w-16' : 'md:w-60'
       )}>
       {/* Logo */}
       <div className={cn('flex items-center gap-2 px-4 py-5 border-b border-slate-700', collapsed && 'justify-center px-2')}>
-        <Droplets className="h-7 w-7 text-blue-400 shrink-0" />
+        <Shield className="h-7 w-7 text-indigo-400 shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
             <div className="font-bold text-lg leading-tight">NUMM</div>
-            <div className="text-xs text-slate-400 leading-tight">BharatOil</div>
+            <div className="text-xs text-slate-400 leading-tight">BharatOil Admin</div>
           </div>
         )}
       </div>
@@ -64,7 +66,7 @@ export default function Sidebar() {
             className={({ isActive }) => cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
               isActive
-                ? 'bg-blue-600 text-white'
+                ? 'bg-indigo-600 text-white'
                 : 'text-slate-300 hover:bg-slate-800 hover:text-white',
               collapsed && 'justify-center px-2'
             )}

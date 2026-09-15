@@ -20,17 +20,13 @@ export default function EntryDashboard() {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <Sidebar />
-      {/* Main content wrapper with margin left to accommodate the fixed sidebar */}
-      {/* Assuming Sidebar is w-60 (240px) when open, and w-16 (64px) when closed. 
-          To handle responsive/collapsible perfectly, we need state lifted or css variables.
-          For now, adding margin left for default w-60.
-      */}
-      <div className="flex-1 flex flex-col ml-60 transition-all duration-300 relative">
+      <div className="flex-1 flex flex-col md:ml-60 transition-all duration-300 relative">
         <Header title={getPageTitle()} />
-        <main className="flex-1 overflow-y-auto p-6 relative">
+        <main key={location.pathname} className="flex-1 overflow-y-auto p-6 relative page-fade-in">
           <Outlet />
         </main>
       </div>
     </div>
   );
 }
+
