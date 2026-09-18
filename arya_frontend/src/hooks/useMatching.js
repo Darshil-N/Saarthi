@@ -15,11 +15,11 @@ export function useApproveMatch() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...payload }) => {
-      const { data } = await api.patch(`/matching/${id}/approve`, payload);
+    mutationFn: async (id) => {
+      const { data } = await api.patch(`/matching/${id}/approve`);
       return data;
     },
-    onMutate: async ({ id }) => {
+    onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ['matching'] });
       const previousMatches = queryClient.getQueryData(['matching']);
       queryClient.setQueryData(['matching'], (old) => 

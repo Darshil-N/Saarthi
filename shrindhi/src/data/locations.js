@@ -1,6 +1,6 @@
 /**
  * BharatOil Warehouse Physical Topology (Mock Data)
- * Conforms strictly to NUMM schema: locations table (architecture.md §5.1 & §13)
+ * Conforms strictly to Saarthi schema: locations table (architecture.md §5.1 & §13)
  * Code format: {WAREHOUSE}-{AISLE}-{RACK}-{BIN}
  */
 

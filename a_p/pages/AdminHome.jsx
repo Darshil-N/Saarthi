@@ -100,7 +100,7 @@ export default function AdminHome() {
       <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl p-6 text-white flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">Admin Control Centre</h2>
-          <p className="text-indigo-200 text-sm mt-1">Full visibility into the NUMM material master &amp; system health</p>
+          <p className="text-indigo-200 text-sm mt-1">Full visibility into the Saarthi material master &amp; system health</p>
         </div>
         <Shield className="w-12 h-12 text-indigo-300 opacity-60" />
       </div>

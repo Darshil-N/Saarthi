@@ -8,13 +8,13 @@ from config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"NUMM API starting – environment: {settings.ENVIRONMENT}")
+    print(f"Saarthi API starting – environment: {settings.ENVIRONMENT}")
     yield
-    print("NUMM API shutting down")
+    print("Saarthi API shutting down")
 
 
 app = FastAPI(
-    title="NUMM – National Unified Material Master",
+    title="Saarthi – Unified Material Master",
     description="Backend API for BharatOil's material master data platform",
     version="1.0.0",
     lifespan=lifespan,
@@ -22,7 +22,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,4 +39,4 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "NUMM API"}
+    return {"status": "ok", "service": "Saarthi API"}

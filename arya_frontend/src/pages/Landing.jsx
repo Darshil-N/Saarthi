@@ -31,7 +31,7 @@ export default function Landing() {
         <div className="flex items-center gap-3">
           <Droplets className="h-8 w-8 text-blue-600" />
           <div>
-            <span className="font-bold text-xl tracking-tight">NUMM</span>
+            <span className="font-bold text-xl tracking-tight">Saarthi</span>
             <span className="ml-2 text-sm text-slate-500 font-medium border-l border-slate-300 pl-2">BharatOil</span>
           </div>
         </div>
@@ -108,7 +108,7 @@ export default function Landing() {
       {/* Live Stats */}
       <section className="py-16 px-8 bg-slate-900 text-white text-center">
         <h2 className="text-2xl font-bold mb-2">BharatOil Material Master — Live Stats</h2>
-        <p className="text-slate-400 mb-10">Data updates live via NUMM AI pipeline</p>
+        <p className="text-slate-400 mb-10">Data updates live via Saarthi AI pipeline</p>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto divide-x divide-white/10">
           {[
@@ -127,7 +127,7 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="bg-slate-950 py-8 text-center text-slate-500 text-sm">
-        <p>NUMM © 2026 BharatOil — One Nation. One Material Code.</p>
+        <p>Saarthi © 2026 BharatOil — One Nation. One Material Code.</p>
       </footer>
     </div>
   );

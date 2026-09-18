@@ -10,9 +10,11 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 
 
 async def generate_embedding(text: str) -> list[float]:
-    """Generate a 768-dim embedding using Gemini gemini-embedding-2."""
+    """Generate a 768-dim embedding using gemini-embedding-001 — must match the
+    model used to generate the stored materials.embedding vectors (seed_embeddings.py),
+    since cosine similarity is meaningless across different embedding models."""
     result = genai.embed_content(
-        model="models/gemini-embedding-2",
+        model="models/gemini-embedding-001",
         content=text,
         task_type="retrieval_query",
         output_dimensionality=768,

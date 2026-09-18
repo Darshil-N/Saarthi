@@ -50,7 +50,7 @@ export default function AdminSidebar() {
         <Shield className="h-7 w-7 text-indigo-400 shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="font-bold text-lg leading-tight">NUMM</div>
+            <div className="font-bold text-lg leading-tight">Saarthi</div>
             <div className="text-xs text-slate-400 leading-tight">BharatOil Admin</div>
           </div>
         )}

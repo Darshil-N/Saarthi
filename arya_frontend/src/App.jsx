@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './hooks/useAuth';
+import { useAuthStore } from './store/authStore';
 
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -32,6 +33,12 @@ import UserManagement from '../../a_p/pages/UserManagement';
 import SystemHealth from '../../a_p/pages/SystemHealth';
 
 function App() {
+  const init = useAuthStore((s) => s.init);
+
+  useEffect(() => {
+    init();
+  }, [init]);
+
   return (
     <Routes>
       <Route path="/" element={<Landing />} />

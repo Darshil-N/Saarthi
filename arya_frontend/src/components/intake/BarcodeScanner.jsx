@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Package, Plus, CheckCircle, Loader2, Search, FileX2 } from 'lucide-react';
+import { Camera, Package, Plus, CheckCircle, Loader2, Search, FileX2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CNMCBadge from '@/components/materials/CNMCBadge';
 

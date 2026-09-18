@@ -17,7 +17,7 @@ export default function OCRUpload() {
   const confirmMutation = useConfirmReceipt();
   const { toast } = useToast();
   
-  const { vendor_id, po_number, receipt_date, receipt_id, line_items } = useIntakeStore();
+  const { vendor_id, po_number, receipt_date, receipt_id, line_items, bill_image_url } = useIntakeStore();
   const { setVendorId, setPoNumber, setReceiptDate } = useIntakeStore();
   
   const [file, setFile] = useState(null);
@@ -72,7 +72,7 @@ export default function OCRUpload() {
       vendor_id,
       receipt_date,
       po_number,
-      bill_image_url: 'placeholder_url', // In a real app, this comes from the upload response
+      bill_image_url: bill_image_url || null,
       line_items
     });
   };

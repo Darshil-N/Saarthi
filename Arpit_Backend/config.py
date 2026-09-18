@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     JWT_SECRET: str
     ENVIRONMENT: str = "development"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Matching thresholds
     SIMILARITY_EXACT: float = 0.95

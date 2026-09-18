@@ -1,6 +1,6 @@
 /**
  * BharatOil Engineering Dashboard Aggregations (Mock Data)
- * Conforms to NUMM architecture GET /dashboard/engineer contract (architecture.md §8 & §9.3)
+ * Conforms to Saarthi architecture GET /dashboard/engineer contract (architecture.md §8 & §9.3)
  */
 
 export const mockDashboardMetrics = {

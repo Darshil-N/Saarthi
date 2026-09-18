@@ -15,7 +15,7 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // In production, token is retrieved from session or localStorage
-    const token = localStorage.getItem('numm_auth_token');
+    const token = localStorage.getItem('saarthi_auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

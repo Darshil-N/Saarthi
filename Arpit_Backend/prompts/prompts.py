@@ -24,6 +24,11 @@ Material description: {description}
 Technical specs: {specs}
 Quality grade: {quality}
 
+The "quality" field in your JSON output MUST be exactly one of: A, B, or C
+(A = good/standard condition, B = fair, C = poor). This is also the CNMC's final
+segment. If no quality signal is given, default to "A". Never put a spec code,
+material grade, or anything other than a single letter A/B/C in this field.
+
 Return ONLY JSON:
 {{
   "cnmc": "...",
@@ -31,7 +36,7 @@ Return ONLY JSON:
   "subcategory": "...",
   "type": "...",
   "spec": "...",
-  "quality": "...",
+  "quality": "A|B|C",
   "standard_description": "...",
   "short_description": "..."
 }}"""

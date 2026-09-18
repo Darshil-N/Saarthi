@@ -7,6 +7,15 @@ import { CheckCircle2, XCircle, ArrowRight, Loader2 } from 'lucide-react';
 import MatchStatusBadge from '@/components/intake/MatchStatusBadge';
 import CNMCBadge from '@/components/materials/CNMCBadge';
 
+// matching_queue.match_type uses a different vocabulary than the OCR-intake
+// MatchStatus enum that MatchStatusBadge renders — map it here.
+function toMatchStatus(matchType) {
+  if (matchType === 'exact' || matchType === 'duplicate') return 'exact_match';
+  if (matchType === 'near_duplicate' || matchType === 'equivalent') return 'near_duplicate';
+  if (matchType === 'different') return 'new_material';
+  return 'uncertain';
+}
+
 export default function PendingApprovals() {
   const { data: queue, isLoading } = useMatchingQueue();
   const approveMutation = useApproveMatch();
@@ -36,10 +45,10 @@ export default function PendingApprovals() {
         <div key={item.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Header */}
           <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-            <MatchStatusBadge 
-              match_status={item.match_status} 
-              confidence={item.confidence} 
-              match_reason={item.match_reason} 
+            <MatchStatusBadge
+              match_status={toMatchStatus(item.match_type)}
+              confidence={item.confidence_score}
+              match_reason={item.match_reason}
             />
             <span className="text-xs font-mono text-slate-400">ID: {item.id}</span>
           </div>
@@ -57,12 +66,12 @@ export default function PendingApprovals() {
             <div className="space-y-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">New Incoming Material</h4>
               <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-lg">
-                <p className="font-medium text-slate-800 text-lg mb-3">{item.description}</p>
+                <p className="font-medium text-slate-800 text-lg mb-3">{item.new_description}</p>
                 <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 mb-4">
-                  <div>Qty: <span className="font-semibold">{item.quantity} {item.unit}</span></div>
-                  <div>Price: <span className="font-semibold">₹{item.unit_price?.toFixed(2)}</span></div>
+                  <div>Category: <span className="font-semibold">{item.new_category}/{item.new_subcategory}</span></div>
+                  <div>Quality: <span className="font-semibold">{item.new_quality || '—'}</span></div>
                 </div>
-                <CNMCBadge cnmc={item.cnmc} is_new_material={true} editable={false} />
+                <CNMCBadge cnmc={item.new_cnmc} is_new_material={true} editable={false} />
               </div>
             </div>
 
@@ -75,14 +84,13 @@ export default function PendingApprovals() {
                    <div className="mb-4">
                      <div className="flex justify-between text-xs mb-1">
                        <span className="text-slate-500 font-medium">Match Confidence</span>
-                       <span className="font-bold text-slate-700">{(item.confidence * 100).toFixed(1)}%</span>
+                       <span className="font-bold text-slate-700">{(item.confidence_score * 100).toFixed(1)}%</span>
                      </div>
-                     <Progress value={item.confidence * 100} className="h-2" />
+                     <Progress value={item.confidence_score * 100} className="h-2" />
                      <p className="mt-2 text-xs text-slate-500 italic leading-snug">{item.match_reason}</p>
                    </div>
-                   {/* In a real app we'd fetch the existing material's CNMC, for now mockup */}
                    <span className="font-mono bg-slate-200 text-slate-800 px-2 py-1 rounded text-xs border border-slate-300">
-                     {item.cnmc.replace(/-NEW$/, '')}
+                     {item.matched_cnmc || '—'}
                    </span>
                  </div>
                ) : (

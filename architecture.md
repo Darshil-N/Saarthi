@@ -1,4 +1,4 @@
-# NUMM — National Unified Material Master
+# Saarthi — Unified Material Master
 ## Complete Architecture & Build Document
 ### Oil & Gas CPSE Demo — "BharatOil"
 
@@ -6,7 +6,7 @@
 
 ## 1. PRODUCT OVERVIEW
 
-**Product Name:** NUMM — National Unified Material Master  
+**Product Name:** Saarthi — Unified Material Master  
 **Demo Entity:** BharatOil (simulated Indian public sector oil company)  
 **Tagline:** One Nation. One Material Code.  
 **Purpose:** AI-powered platform to standardize, deduplicate, and intelligently manage material master data across departments of a public sector oil company — with the architecture to scale across multiple CPSEs.
@@ -1210,4 +1210,4 @@ ALLOWED_ORIGINS=https://your-vercel-app.vercel.app,http://localhost:5173
 
 ---
 
-*Document version: 1.0 | Project: NUMM | Entity: BharatOil Demo*
+*Document version: 1.0 | Project: Saarthi | Entity: BharatOil Demo*

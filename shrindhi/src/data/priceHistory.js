@@ -1,6 +1,6 @@
 /**
  * BharatOil Price History & Vendors (Mock Data)
- * Conforms strictly to NUMM schema: price_history and vendors tables (architecture.md §5.1 & §13)
+ * Conforms strictly to Saarthi schema: price_history and vendors tables (architecture.md §5.1 & §13)
  */
 
 export const mockVendors = [

@@ -351,7 +351,7 @@ export function NLQuery() {
 
                     <div className="pt-2 text-[10px] text-slate-500 flex items-center justify-between">
                       <span>Dialect: PostgreSQL 15 / Supabase pgvector compatible</span>
-                      <span>Execution Engine: NUMM Mock v1.0</span>
+                      <span>Execution Engine: Saarthi Mock v1.0</span>
                     </div>
                   </div>
                 )}

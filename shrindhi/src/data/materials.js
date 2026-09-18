@@ -1,6 +1,6 @@
 /**
  * BharatOil Master Materials Catalog (Mock Data)
- * Conforms strictly to NUMM schema: materials table (architecture.md §5.1)
+ * Conforms strictly to Saarthi schema: materials table (architecture.md §5.1)
  * Common National Material Code (CNMC) format: {CATEGORY}-{SUBCATEGORY}-{TYPE}-{SPEC}-{QUALITY}
  */
 

@@ -1,6 +1,6 @@
 /**
  * BharatOil NL Query Log & History (Mock Data)
- * Conforms strictly to NUMM schema: nl_query_log table (architecture.md §5.1)
+ * Conforms strictly to Saarthi schema: nl_query_log table (architecture.md §5.1)
  */
 
 export const mockQueries = [

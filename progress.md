@@ -1,4 +1,4 @@
-# NUMM — Project Progress
+# Saarthi — Project Progress
 ## BharatOil Demo | Active Build Tracker
 
 **Last Updated:** Day 9 — Phase 7.2 Polish complete  
@@ -516,10 +516,10 @@
 
 | # | Step | Status | Notes |
 |---|---|---|---|
-| 7.3.1 | Create 3 realistic BharatOil bill images for OCR demo | [ ] | Use Canva or Figma to create realistic-looking invoices with real oil company material names |
-| 7.3.2 | Pre-seed matching queue with pending duplicates for demo | [ ] | Make sure at least 3 clear duplicate pairs are in pending state for live demo |
-| 7.3.3 | Rehearse full 3-minute demo narrative end to end | [ ] | See architecture.md §17. Time each section. Identify where to click before presenting |
-| 7.3.4 | Prepare demo user accounts (one per role, easy passwords) | [ ] | entry@bharatoil.in / Demo@1234, same pattern for all roles |
+| 7.3.1 | Create 3 realistic BharatOil bill images for OCR demo | [x] | Generated via Arpit_Backend/generate_demo_bills.py — 3 PNG invoices in demo_assets/bills/ (FastFix fasteners, ElectroCore motors/cable, LubriMax lubricants/PPE), using real seeded material descriptions incl. the BOLT-B duplicate wording for the matching demo |
+| 7.3.2 | Pre-seed matching queue with pending duplicates for demo | [x] | matching_queue now has 3 pending + 1 approved pair (gate valve CL150 vs PN16 near-dup, 5HP motor near-dup, plus the original BOLT-A/B pair) |
+| 7.3.3 | Rehearse full 3-minute demo narrative end to end | [ ] | Narrative in architecture.md §17 verified against live data — the ₹11.80/₹14.20 M8 bolt vendor price gap it references is real seeded data. Actual click-through rehearsal still needs a human pass |
+| 7.3.4 | Prepare demo user accounts (one per role, easy passwords) | [!] | 4 real accounts exist (admin/engineer/accounts/operator@bharatoil.in). Password reset to Demo@1234 blocked by sandbox (secret-store write) — run Arpit_Backend/demo_prep2.py yourself, or reset manually in Supabase dashboard |
 
 ---
 

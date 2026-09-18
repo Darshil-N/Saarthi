@@ -20,7 +20,7 @@ def _map_to_match_status(match_type: str, confidence: float) -> str:
     return "uncertain"
 
 async def _call_gemini_batch_matcher(incoming_desc: str, incoming_specs: dict, candidates: list) -> dict:
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-flash-lite-latest")
     
     candidates_text = ""
     for idx, c in enumerate(candidates):
@@ -64,6 +64,8 @@ async def run_matching(
 ) -> dict:
     embedding = await generate_embedding(incoming_description)
     candidates = await find_similar_materials(supabase, embedding, top_k=5, threshold=0.70)
+    print(f"[matching] desc={incoming_description!r} -> {len(candidates)} candidates: "
+          f"{[(c.get('cnmc'), round(c.get('similarity', 0), 3)) for c in candidates]}")
 
     best_result = {
         "match_status": "new_material",
@@ -83,7 +85,8 @@ async def run_matching(
 
     # Batch evaluate all candidates in 1 request
     gemini_out = await _call_gemini_batch_matcher(incoming_description, incoming_specs or {}, candidates)
-    
+    print(f"[matching] gemini_out={gemini_out!r}")
+
     best_candidate_id = gemini_out.get("best_candidate_id")
     match_type = gemini_out.get("match_type", "different")
     confidence = float(gemini_out.get("confidence", 0.0))

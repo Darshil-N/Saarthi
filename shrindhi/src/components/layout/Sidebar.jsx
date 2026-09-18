@@ -56,7 +56,7 @@ export function Sidebar() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 leading-none">
-              <span className="font-bold text-slate-900 text-sm tracking-tight font-mono">NUMM</span>
+              <span className="font-bold text-slate-900 text-sm tracking-tight font-mono">Saarthi</span>
               <span className="text-[10px] text-slate-400 font-sans font-medium">BharatOil</span>
             </div>
             <div className="text-[10px] text-slate-500 font-sans truncate mt-0.5">

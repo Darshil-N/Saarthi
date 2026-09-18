@@ -4,7 +4,7 @@ import { useToast } from '../hooks/use-toast';
 import api from '../lib/api';
 
 export function useOCRUpload() {
-  const { setReceiptId, setLineItems } = useIntakeStore();
+  const { setReceiptId, setLineItems, setBillImageUrl } = useIntakeStore();
   const { toast } = useToast();
 
   return useMutation({
@@ -17,6 +17,7 @@ export function useOCRUpload() {
     onSuccess: (data) => {
       setReceiptId(data.receipt_id);
       setLineItems(data.line_items || []);
+      setBillImageUrl(data.bill_image_url || '');
       toast({
         title: "Success",
         description: "Receipt processed successfully.",

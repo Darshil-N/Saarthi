@@ -40,6 +40,7 @@ class LineItem(BaseModel):
 class OCRResponse(BaseModel):
     receipt_id: str
     line_items: List[LineItem]
+    bill_image_url: Optional[str] = None
 
 
 class BarcodeRequest(BaseModel):

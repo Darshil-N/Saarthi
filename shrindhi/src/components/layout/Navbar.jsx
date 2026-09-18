@@ -72,14 +72,14 @@ export function Navbar() {
             <div className="leading-tight">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-900 text-base tracking-tight font-mono">
-                  NUMM
+                  Saarthi
                 </span>
                 <span className="text-[10px] font-semibold uppercase px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 border border-amber-500/20 font-mono">
                   BharatOil
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
-                National Unified Material Master
+                Unified Material Master
               </p>
             </div>
           </div>

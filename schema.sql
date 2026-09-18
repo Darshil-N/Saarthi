@@ -1,5 +1,5 @@
 -- ============================================================
--- NUMM — National Unified Material Master
+-- Saarthi — Unified Material Master
 -- Supabase / PostgreSQL Schema
 -- Project: BharatOil Demo
 -- Version: 1.0
@@ -109,7 +109,7 @@ CREATE TRIGGER vendors_updated_at
 
 -- ============================================================
 -- STEP 3 — MATERIAL MASTER
--- The canonical unified table — heart of NUMM
+-- The canonical unified table — heart of Saarthi
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.materials (

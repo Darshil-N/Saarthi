@@ -38,7 +38,7 @@ export function executeMockQuery(naturalLanguageQuery) {
         });
       }
     }
-    // Always sort by quantity descending as specified in NUMM
+    // Always sort by quantity descending as specified in Saarthi
     return rows.sort((a, b) => b.available_quantity - a.available_quantity);
   };
 

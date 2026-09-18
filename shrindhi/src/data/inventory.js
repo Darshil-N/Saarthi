@@ -1,6 +1,6 @@
 /**
  * BharatOil Inventory & Stock Levels (Mock Data)
- * Conforms strictly to NUMM schema: inventory table (architecture.md §5.1)
+ * Conforms strictly to Saarthi schema: inventory table (architecture.md §5.1)
  */
 
 export const mockInventory = [

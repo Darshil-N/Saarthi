@@ -43,7 +43,7 @@ export default function EngineerSidebar() {
         <Wrench className="h-7 w-7 text-teal-400 shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="font-bold text-lg leading-tight">NUMM</div>
+            <div className="font-bold text-lg leading-tight">Saarthi</div>
             <div className="text-xs text-slate-400 leading-tight">BharatOil Engineering</div>
           </div>
         )}

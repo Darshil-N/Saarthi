@@ -50,7 +50,7 @@ export function ProtectedRoute({ requiredRole = 'engineer' }) {
       <footer className="py-4 px-6 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
         <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2 font-mono text-[11px]">
-            <span className="font-semibold text-slate-800">NUMM</span>
+            <span className="font-semibold text-slate-800">Saarthi</span>
             <span>•</span>
             <span>BharatOil Corporation Limited</span>
             <span>•</span>

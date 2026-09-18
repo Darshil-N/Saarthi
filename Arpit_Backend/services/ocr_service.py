@@ -27,7 +27,7 @@ Each object MUST have the following keys:
 """
 
 async def run_ocr(file_bytes: bytes, mime_type: str = "image/jpeg") -> list:
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-flash-lite-latest")
     image_part = {
         "mime_type": mime_type,
         "data": file_bytes,
@@ -49,7 +49,7 @@ async def run_ocr(file_bytes: bytes, mime_type: str = "image/jpeg") -> list:
         return []
 
 async def upload_bill_to_storage(supabase: Client, file_bytes: bytes, content_type: str) -> str:
-    bucket = "receipts"
+    bucket = "bill-images"
     ext = "pdf" if "pdf" in content_type else "jpg"
     filename = f"{uuid.uuid4()}.{ext}"
     try:

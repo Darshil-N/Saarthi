@@ -57,7 +57,7 @@ export default function Login() {
           <Droplets className="h-12 w-12 text-blue-600" />
         </div>
         <h2 className="mt-2 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-          NUMM
+          Saarthi
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600 font-medium">
           Sign in to your account

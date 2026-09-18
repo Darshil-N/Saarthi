@@ -11,7 +11,7 @@ async def list_pending(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     resp = (
-        supabase.table("matching_queue")
+        supabase.table("v_matching_queue_detailed")
         .select("*")
         .eq("status", "pending")
         .order("created_at", desc=False)

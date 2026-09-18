@@ -37,7 +37,7 @@ async def generate_cnmc(
     Call Gemini to generate a CNMC for the given material description,
     validate the format, ensure uniqueness, and return the full classification dict.
     """
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-flash-lite-latest")
     prompt = CNMC_PROMPT.format(
         description=description,
         specs=specs or "not specified",
