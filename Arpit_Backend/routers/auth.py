@@ -30,6 +30,7 @@ async def login(body: LoginRequest, supabase: Client = Depends(get_supabase)):
 
     return LoginResponse(
         access_token=session.access_token,
+        refresh_token=session.refresh_token,
         token_type="bearer",
         role=role,
         user_id=user.id,

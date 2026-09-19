@@ -14,10 +14,18 @@ const EXAMPLE_QUERIES = [
 const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
 async function runNLQuery(query) {
-  // Call the backend NL→SQL endpoint
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const stored = JSON.parse(localStorage.getItem('mock_auth') || 'null');
+    if (stored?.session?.access_token) {
+      headers.Authorization = `Bearer ${stored.session.access_token}`;
+    }
+  } catch (_) { /* ignore */ }
+
+  // Call the backend NL->data lookup endpoint
   const res = await fetch(`${API_BASE}/materials/nl-query`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ query }),
   });
   if (!res.ok) {

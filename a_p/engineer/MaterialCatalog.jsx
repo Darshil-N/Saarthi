@@ -47,7 +47,7 @@ export default function MaterialCatalog() {
       let q = supabase
         .from('materials')
         .select(
-          'id, cnmc, category, subcategory, type, spec, quality, standard_description, short_description, uom, status, created_at',
+          'id, cnmc, category, subcategory, material_type, spec, quality_grade, standard_description, short_description, unit_of_measure, status, created_at',
           { count: 'exact' }
         );
 
@@ -86,13 +86,13 @@ export default function MaterialCatalog() {
       const [invRes, eqRes] = await Promise.all([
         supabase
           .from('inventory')
-          .select('location_code, quantity_on_hand, quantity_reserved, last_receipt_date')
+          .select('location_code, quantity, reserved_quantity, last_movement_at')
           .eq('material_id', material.id),
         supabase
           .from('matching_queue')
-          .select('*, candidate_material:candidate_material_id(standard_description, cnmc)')
-          .eq('incoming_material_id', material.id)
-          .eq('match_status', 'approved')
+          .select('*, candidate_material:matched_material_id(standard_description, cnmc)')
+          .eq('new_material_id', material.id)
+          .eq('status', 'approved')
           .limit(5),
       ]);
       setDetailInventory(invRes.data || []);
@@ -207,7 +207,7 @@ export default function MaterialCatalog() {
                         <span className="text-slate-600">{m.category}</span>
                         {m.subcategory && <span className="text-slate-400"> › {m.subcategory}</span>}
                       </td>
-                      <td className="px-5 py-3 text-slate-500 text-xs">{m.uom || '—'}</td>
+                      <td className="px-5 py-3 text-slate-500 text-xs">{m.unit_of_measure || '—'}</td>
                       <td className="px-5 py-3"><StatusBadge status={m.status} /></td>
                     </tr>
                   ))}
@@ -260,10 +260,10 @@ export default function MaterialCatalog() {
                     {[
                       ['Category', detailMaterial.category],
                       ['Subcategory', detailMaterial.subcategory],
-                      ['Type', detailMaterial.type],
+                      ['Type', detailMaterial.material_type],
                       ['Spec', detailMaterial.spec],
-                      ['Quality', detailMaterial.quality],
-                      ['UoM', detailMaterial.uom],
+                      ['Quality', detailMaterial.quality_grade],
+                      ['UoM', detailMaterial.unit_of_measure],
                       ['Status', null],
                     ].map(([label, val]) => (
                       <div key={label}>
@@ -292,8 +292,8 @@ export default function MaterialCatalog() {
                       {detailInventory.map((inv, i) => (
                         <div key={i} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
                           <span className="text-xs text-slate-600 font-mono">{inv.location_code}</span>
-                          <span className={`text-sm font-bold ${inv.quantity_on_hand <= 5 ? 'text-red-600' : inv.quantity_on_hand <= 20 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {inv.quantity_on_hand}
+                          <span className={`text-sm font-bold ${inv.quantity <= 5 ? 'text-red-600' : inv.quantity <= 20 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {inv.quantity}
                           </span>
                         </div>
                       ))}

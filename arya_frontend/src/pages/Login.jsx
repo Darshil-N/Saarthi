@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
+import supabase from '@/lib/supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -25,13 +26,20 @@ export default function Login() {
       // Call real backend POST /auth/login
       const { data } = await api.post('/auth/login', { email, password });
 
-      // data = { access_token, token_type, role, user_id, email }
-      const session = { access_token: data.access_token };
+      // data = { access_token, refresh_token, token_type, role, user_id, email }
+      const session = { access_token: data.access_token, refresh_token: data.refresh_token };
       const user = { full_name: data.email, id: data.user_id, email: data.email };
       const role = data.role;
 
       // Persist for the api.js interceptor
       localStorage.setItem('mock_auth', JSON.stringify({ session, user, role }));
+
+      // Also establish a real Supabase client session so RLS-gated direct
+      // Supabase queries (Admin/Accounts/Engineer dashboards) can see data.
+      await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
 
       login(session, user, role);
 

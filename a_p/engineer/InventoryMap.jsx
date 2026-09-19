@@ -51,8 +51,8 @@ export default function InventoryMap() {
       const { data, error } = await supabase
         .from('inventory')
         .select(
-          'id, location_code, quantity_on_hand, quantity_reserved, last_receipt_date,' +
-          'materials(id, cnmc, standard_description, short_description, uom, category)'
+          'id, material_id, location_code, quantity, reserved_quantity, reorder_level, max_stock, last_movement_at,' +
+          'materials(id, cnmc, standard_description, short_description, unit_of_measure, category)'
         );
       if (error) throw error;
       setInventory(data || []);
@@ -196,7 +196,7 @@ export default function InventoryMap() {
                           <div className="flex flex-wrap gap-2">
                             {binCodes.map(binCode => {
                               const items = bins[binCode];
-                              const totalQty = items.reduce((s, i) => s + (i.quantity_on_hand || 0), 0);
+                              const totalQty = items.reduce((s, i) => s + (i.quantity || 0), 0);
                               const colors = getBinColor(totalQty);
                               const isSelected = selectedBin?.location === binCode;
                               const shortCode = binCode.split('-').slice(-1)[0];
@@ -244,7 +244,7 @@ export default function InventoryMap() {
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {selectedBin.items.map((item, i) => {
-              const colors = getBinColor(item.quantity_on_hand);
+              const colors = getBinColor(item.quantity);
               return (
                 <div key={i} className="px-5 py-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-start justify-between gap-2">
@@ -256,18 +256,18 @@ export default function InventoryMap() {
                       <p className="text-xs text-slate-400 mt-1">{item.materials?.category}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-xl font-bold ${colors.text}`}>{item.quantity_on_hand}</p>
-                      <p className="text-xs text-slate-400">{item.materials?.uom || 'EA'}</p>
+                      <p className={`text-xl font-bold ${colors.text}`}>{item.quantity}</p>
+                      <p className="text-xs text-slate-400">{item.materials?.unit_of_measure || 'EA'}</p>
                       <span className={`text-xs font-medium ${colors.text}`}>{colors.label}</span>
                     </div>
                   </div>
-                  {item.last_receipt_date && (
+                  {item.last_movement_at && (
                     <p className="text-xs text-slate-400 mt-2">
-                      Last received: {new Date(item.last_receipt_date).toLocaleDateString('en-IN')}
+                      Last received: {new Date(item.last_movement_at).toLocaleDateString('en-IN')}
                     </p>
                   )}
-                  {item.quantity_reserved > 0 && (
-                    <p className="text-xs text-amber-600 mt-1">Reserved: {item.quantity_reserved}</p>
+                  {item.reserved_quantity > 0 && (
+                    <p className="text-xs text-amber-600 mt-1">Reserved: {item.reserved_quantity}</p>
                   )}
                 </div>
               );

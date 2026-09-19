@@ -13,7 +13,7 @@ import OCRResultsTable from '@/components/intake/OCRResultsTable';
 const STATUS_COLORS = {
   draft: 'secondary',
   processing: 'default',
-  confirmed: 'outline',
+  completed: 'outline',
   rejected: 'destructive',
 };
 
