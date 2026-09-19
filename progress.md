@@ -1,655 +1,448 @@
-# Saarthi — Project Progress
-## BharatOil Demo | Active Build Tracker
+# Saarthi — Progress Tracker
 
-**Last Updated:** Day 9 — Phase 7.2 Polish complete  
-**Overall Progress:** 116 / 130 steps complete  
-**Status:** 🟡 In Progress
+**Last updated:** 2026-09-19 — plan approved; pre-audit work committed locally (5cedcce); fixes not started
+**Overall:** 6 / 146 steps complete
+**Status:** 🟡 In progress — plan approved; decisions D-1, D-5, D-6, D-7, D-8 still open
 
----
+## How to use this file
 
-## HOW TO USE THIS FILE
+- Update the status of a step the moment it changes; add what changed under Notes.
+- `[ ]` not started · `[~]` in progress · `[x]` done and verified · `[!]` blocked (say why) · `[-]` skipped (say why)
+- A step is only `[x]` when it has been verified by running it, not when the code is written.
+- Flags: 🔒 DB (approval per action) · ❓ Decision · 🗑 Delete (approval) · 🌐 Quota
+- Refresh the counts and *Last updated* after every session. Log blockers in the Blockers table immediately.
 
-- Update `[Status]` per step: `[ ]` not started → `[~]` in progress → `[x]` done → `[!]` blocked
-- Update `Notes` with what was done, what broke, what changed
-- Update `Last Updated` and `Overall Progress` at the top after every session
-- Mark blockers with `[!]` and add a note immediately so anyone picking it up knows the context
+## Phase summary
 
-**Status Key:**
-| Symbol | Meaning |
-|---|---|
-| `[ ]` | Not started |
-| `[~]` | In progress |
-| `[x]` | Complete |
-| `[!]` | Blocked — see notes |
-| `[-]` | Skipped / not needed |
-
----
-
----
-
-# PHASE 1 — Foundation
-**Target:** Days 1–2  
-**Status:** 🟢 Completed  
-**Steps Complete:** 20 / 20
-
----
-
-## Part 1.1 — Project Setup
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
+| Phase | Name | Done | Status |
 |---|---|---|---|
-| 1.1.1 | Initialize React + Vite + Tailwind + Shadcn | [x] | |
-| 1.1.2 | Initialize FastAPI project with folder structure | [x] | |
-| 1.1.3 | Set up environment variables for both frontend and backend | [x] | |
-| 1.1.4 | Configure CORS, middleware, and health check endpoint | [x] | |
+| 0 | Governance, Decisions & Live-DB Baseline | 6 / 13 | 🟡 In progress |
+| 1 | Database Security & Schema Fixes | 0 / 14 | ⚪ Not started |
+| 2 | Backend Foundation | 0 / 14 | ⚪ Not started |
+| 3 | Intake Pipeline (OCR, Barcode, Confirm, Matching) | 0 / 30 | ⚪ Not started |
+| 4 | Natural-Language Query (real Gemini) | 0 / 10 | ⚪ Not started |
+| 5 | Engineer Dashboard | 0 / 9 | ⚪ Not started |
+| 6 | Accounts Dashboard on Real Data | 0 / 14 | ⚪ Not started |
+| 7 | Admin Dashboard | 0 / 12 | ⚪ Not started |
+| 8 | One Consistent Dataset | 0 / 11 | ⚪ Not started |
+| 9 | Frontend Structure, Session & Quality | 0 / 11 | ⚪ Not started |
+| 10 | Verification & Deployment | 0 / 8 | ⚪ Not started |
 
 ---
 
-## Part 1.2 — Supabase Setup
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** All tables, RLS, and vector extensions initialized via schema.sql
+# Phase 0 — Governance, Decisions & Live-DB Baseline
+**Steps complete:** 6 / 13
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 1.2.1 | Create Supabase project | [x] | |
-| 1.2.2 | Run all table creation SQL (12 tables) | [x] | Tables: profiles, vendors, materials, material_code_mappings, inventory, locations, goods_receipts, gr_line_items, price_history, matching_queue, audit_log, nl_query_log |
-| 1.2.3 | Enable pgvector extension | [x] | Run: `create extension vector` in Supabase SQL editor |
-| 1.2.4 | Write and apply RLS policies per role | [x] | 4 roles: entry_operator, engineer, accounts, admin |
-| 1.2.5 | Create Supabase Storage bucket for bill images | [x] | Bucket name: `bill-images`, public read off |
+## Part 0.1 — Audit and project records  (4 / 4)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 0.1.1 | Complete full-codebase audit | [x] | P1 |  | Backend, main frontend, a_p, shrindhi, schema, seeds reviewed. |
+| 0.1.2 | Write audit.md (65 findings, evidence level per finding) | [x] |  |  |  |
+| 0.1.3 | Rewrite plan.md and progress.md as a bug-by-bug fix plan | [x] | P1 |  | Old build plan remains in git history. |
+| 0.1.4 | Record working rules and product decisions in assistant memory | [x] |  |  |  |
 
-## Part 1.3 — Authentication
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+## Part 0.2 — Decisions and housekeeping  (2 / 3)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 1.3.1 | Connect Supabase Auth to FastAPI (JWT validation middleware) | [x] | Use supabase-py, validate JWT on every protected route |
-| 1.3.2 | Connect Supabase Auth to React (session management) | [x] | Use @supabase/supabase-js, store session in Zustand authStore |
-| 1.3.3 | Build Login page with role-based redirect | [x] | Route: /login — redirect to /entry, /engineer, /accounts, /admin based on role in profile |
-| 1.3.4 | Build ProtectedRoute component with role guard | [x] | Wrap all dashboard routes, redirect to /login if no session |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 0.2.1 | Decide data-access pattern: FastAPI for everything vs. direct Supabase for reads | [ ] | Q5 | ❓ Decision | Open. See Decisions Log D-1. |
+| 0.2.2 | Approve the order of the fix phases in this plan | [x] |  | ❓ Decision | Approved by the user on 2026-09-19. |
+| 0.2.3 | Commit the existing uncommitted working tree locally (12 modified files + seed_demo_data.py) | [x] | Q4 | ❓ Decision | Local commit 5cedcce; nothing pushed. |
 
----
+## Part 0.3 — Live-database baseline (read-only, one approval per action)  (0 / 6)
 
-## Part 1.4 — Seed Data
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** Seed order matters — vendors and locations before materials, materials before inventory and price_history
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 1.4.1 | Seed vendors (10 vendors) | [x] | FastFix, PipePro, ValveTech, ElectroCore, LubriMax, SafeGear, WeldPro, SteelCraft, ChemiFluid, ToolMart |
-| 1.4.2 | Seed warehouse locations (3 warehouses, all aisles and bins) | [x] | WHSE-A (mechanical), WHSE-B (electrical), WHSE-C (chemicals & consumables) |
-| 1.4.3 | Seed 50+ materials with intentional duplicates and near-duplicates | [x] | Included duplicates for demo — seeded via schema.sql |
-| 1.4.4 | Generate and store embeddings for all seeded materials | [x] | Called Gemini gemini-embedding-001 per material, stored 768-dim in materials.embedding |
-| 1.4.5 | Seed inventory levels across locations | [x] | Mix of healthy stock, low stock, and overstock for dashboard variety |
-| 1.4.6 | Seed price history (6 months, multiple vendors per material) | [x] | Handled via schema.sql |
-| 1.4.7 | Seed user accounts for all 4 roles | [x] | Handled via schema.sql auth.users inserts / profile triggers |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 0.3.1 | Check whether public sign-up is enabled in Supabase Auth | [ ] | D2 | 🔒 DB |  |
+| 0.3.2 | List live RLS policies on profiles | [ ] | D1 | 🔒 DB |  |
+| 0.3.3 | Check anon/authenticated grants on views and RPCs, and view security_invoker setting | [ ] | D3 | 🔒 DB |  |
+| 0.3.4 | Check whether inventory is in the supabase_realtime publication | [ ] | G5 | 🔒 DB |  |
+| 0.3.5 | Inspect vector index definition and test candidate recall | [ ] | D4 | 🔒 DB |  |
+| 0.3.6 | Capture per-table row counts as the baseline for the dataset work | [ ] |  | 🔒 DB |  |
 
 ---
 
-**Phase 1 Completion Checklist:**
-- [x] Both frontend and backend run locally without errors
-- [x] Login works for all 4 roles and redirects correctly
-- [x] All 12 tables exist in Supabase with correct schema
-- [x] pgvector enabled and materials table has embedding column populated
-- [x] All seed data visible in Supabase table editor
+# Phase 1 — Database Security & Schema Fixes
+**Steps complete:** 0 / 14
+
+## Part 1.1 — Access control  (0 / 6)
+
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 1.1.1 | Restrict profiles self-update so role and is_active cannot be changed by the user | [ ] | D1 | 🔒 DB |  |
+| 1.1.2 | Remove or constrain profiles_insert_self | [ ] | D1 | 🔒 DB |  |
+| 1.1.3 | Make handle_new_user ignore metadata role; default to least privilege | [ ] | D2 | 🔒 DB |  |
+| 1.1.4 | Make views security_invoker (or grant explicitly) so RLS applies | [ ] | D3 | 🔒 DB |  |
+| 1.1.5 | Revoke blanket anon grants on tables, views and routines; grant only what is needed | [ ] | D3 | 🔒 DB |  |
+| 1.1.6 | Add SET search_path to all SECURITY DEFINER functions | [ ] | D3 | 🔒 DB |  |
+
+## Part 1.2 — Migrations and schema alignment  (0 / 8)
+
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 1.2.1 | Create a migrations/ folder; remove the duplicate schema.sql copy; document how to apply | [ ] | D5 | 🗑 Delete | Deleting one of the two identical copies needs approval. |
+| 1.2.2 | Confirm_receipt RPC: one transaction creating GR, lines, new materials, inventory upsert, price_history and audit rows | [ ] | E2, E3, E5, E6, A7 | 🔒 DB |  |
+| 1.2.3 | approve_mapping RPC: merge stock, repoint references, deprecate duplicate, audit | [ ] | E12 | 🔒 DB |  |
+| 1.2.4 | Read-only NL-query executor (restricted role or RPC with statement timeout, allow-listed views) | [ ] | G1 | 🔒 DB |  |
+| 1.2.5 | Aggregate RPCs/views for Accounts: price comparison, savings opportunities, valuation (latest price), aging, vendor scorecard, purchase history | [ ] | C1, C3, B8 | 🔒 DB |  |
+| 1.2.6 | Admin RPCs: dashboard stats, matching-queue stats, system-health metrics | [ ] | M5, M6, B8 | 🔒 DB |  |
+| 1.2.7 | Add inventory to the realtime publication (if the map keeps its Live claim) | [ ] | G5 | 🔒 DB ❓ Decision |  |
+| 1.2.8 | Rebuild vector index for the real data size (HNSW or ivfflat with suitable lists/probes) | [ ] | D4 | 🔒 DB |  |
 
 ---
 
----
+# Phase 2 — Backend Foundation
+**Steps complete:** 0 / 14
 
-# PHASE 2 — Intake Pipeline
-**Target:** Days 3–4  
-**Status:** 🟢 Completed  
-**Steps Complete:** 20 / 20
+## Part 2.1 — Auth and access control  (0 / 7)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 2.1.1 | Shared Supabase client and cached token verification (remove per-request client creation) | [ ] | B5 |  |  |
+| 2.1.2 | Reject users with no profile or is_active = false; remove role defaults | [ ] | B4 |  |  |
+| 2.1.3 | Real logout that revokes the user's session | [ ] | B3 |  |  |
+| 2.1.4 | Return generic auth errors; log details server-side | [ ] | B6 |  |  |
+| 2.1.5 | Enforce role checks on every endpoint (including /intake/confirm and /intake/barcode) | [ ] | B1 |  |  |
+| 2.1.6 | Decide and implement the approval-authority matrix (who may approve materials / mappings) | [ ] | B10 | ❓ Decision |  |
+| 2.1.7 | Replace .single() with maybe_single() and proper 404 handling | [ ] | B2 |  |  |
 
-## Part 2.1 — OCR Service (Backend)
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+## Part 2.2 — Reliability and hygiene  (0 / 7)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 2.1.1 | Integrate Gemini Vision API in FastAPI | [x] | Use google-generativeai SDK, model: gemini-1.5-flash |
-| 2.1.2 | Write OCR prompt template and parser | [x] | See architecture.md §12 for prompt. Parser converts raw Gemini JSON to OCRLineItem Pydantic model |
-| 2.1.3 | Build bill image upload endpoint (save to Supabase Storage) | [x] | POST /intake/upload-bill — returns storage URL |
-| 2.1.4 | Build OCR extraction endpoint returning structured line items | [x] | POST /intake/ocr — takes storage URL, returns list of line items with match suggestions |
-| 2.1.5 | Handle multi-page PDFs and image quality fallbacks | [x] | If Gemini returns low-confidence extraction, flag line item as Uncertain |
-
----
-
-## Part 2.2 — OCR UI (Frontend)
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 2.2.1 | Build drag-and-drop bill upload component | [x] | Accept PDF and image files, show preview thumbnail |
-| 2.2.2 | Build processing / loading state | [x] | Animated spinner with "Analyzing bill with AI..." message |
-| 2.2.3 | Build OCR results table (editable: qty, price, quality, location) | [x] | Inline editing — click cell to edit. Quality dropdown (A/B/C). Location dropdown from locations table |
-| 2.2.4 | Build match status badges (Exact / Near-Duplicate / New / Uncertain) | [x] | Green / Yellow / Blue / Red badges. Near-Duplicate expandable to show matched material and confidence |
-| 2.2.5 | Build "Confirm Receipt" flow and GR creation | [x] | Disabled until all rows have location assigned. Shows GR number on success |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 2.2.1 | Structured logging and a global exception handler with request IDs (replace print) | [ ] | B7, A7 |  |  |
+| 2.2.2 | Dashboard stats: UTC-correct 'today', surface errors instead of returning 0 | [ ] | B7 |  |  |
+| 2.2.3 | Run blocking SDK calls (Gemini, Supabase) off the event loop | [ ] | A3 |  |  |
+| 2.2.4 | Config cleanup: drop unused JWT_SECRET / python-jose; add google-genai; pin and document deps | [ ] | B9, A5 |  |  |
+| 2.2.5 | Remove dead code (mismatched models, unused prompts, broken match_materials_rpc.sql) | [ ] | B9 | 🗑 Delete | File deletions need approval. |
+| 2.2.6 | Bounds and pagination limits on all list endpoints | [ ] | B8 |  |  |
+| 2.2.7 | pytest scaffold with mocked Supabase and Gemini; first tests for auth and role checks | [ ] | Q3 |  |  |
 
 ---
 
-## Part 2.3 — Barcode Scanner (Frontend + Backend)
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+# Phase 3 — Intake Pipeline (OCR, Barcode, Confirm, Matching)
+**Steps complete:** 0 / 30
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 2.3.1 | Integrate @zxing/browser webcam scanning | [x] | npm install @zxing/browser. Use BrowserMultiFormatReader for broad format support |
-| 2.3.2 | Build scanning overlay UI with live camera feed | [x] | Green animated box on detected barcode. Show decoded value below feed |
-| 2.3.3 | Build barcode lookup endpoint (CNMC + legacy code lookup) | [x] | POST /intake/barcode — checks material_code_mappings first, then materials.cnmc |
-| 2.3.4 | Build material pre-fill on successful scan | [x] | Auto-populate description, unit, last known price from price_history |
-| 2.3.5 | Build multi-item scan session before confirming GR | [x] | Running list of scanned items, quantity input per item, "Add Another" flow |
+## Part 3.1 — OCR service  (0 / 6)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 3.1.1 | Robust JSON extraction (fence-tolerant, request JSON mime type) | [ ] | A1 | 🌐 Quota |  |
+| 3.1.2 | Distinguish 'unreadable bill' from quota/network errors in the API response | [ ] | A1 |  |  |
+| 3.1.3 | Validate and coerce OCR fields (null/strings/units) before use | [ ] | A2 |  |  |
+| 3.1.4 | Make OCR a read-only draft: no materials, queue rows or audit rows before confirm | [ ] | E4, E5, A7 | ❓ Decision | Design change proposed in Decisions Log D-6. |
+| 3.1.5 | Signed URLs for the private bill-images bucket; correct file extension per type | [ ] | A8 |  |  |
+| 3.1.6 | Upload type/size validation with clear errors | [ ] | E14, A8 |  |  |
 
-## Part 2.4 — Goods Receipt Management
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+## Part 3.2 — Matching and CNMC  (0 / 6)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 2.4.1 | Build GR creation endpoint (header + line items) | [x] | POST /intake/confirm — creates goods_receipt + gr_line_items in transaction |
-| 2.4.2 | Build GR list screen with filters | [x] | Filter by: date range, vendor, status. Show GR number, vendor, item count, total value, status |
-| 2.4.3 | Build GR detail screen with line item breakdown | [x] | All line items with material, qty, price, quality, location |
-| 2.4.4 | Build inventory update on GR confirmation | [x] | UPSERT into inventory — add received qty to existing stock at given location |
-| 2.4.5 | Build price_history insert on GR confirmation | [x] | Insert one row per line item into price_history |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 3.2.1 | Batch embeddings and parallelise per-line work; run post-confirm matching as a BackgroundTask | [ ] | A3 | 🌐 Quota |  |
+| 3.2.2 | Use configured similarity thresholds; implement auto-resolve for high-confidence exact matches | [ ] | A4 |  |  |
+| 3.2.3 | Align stored and runtime embedding text and task type; re-embed materials | [ ] | A5 | 🔒 DB 🌐 Quota | Re-embedding writes to the database and uses Gemini quota. |
+| 3.2.4 | Centralise model names in config (no floating alias in code) | [ ] | A6 |  |  |
+| 3.2.5 | Guard CNMC generation with a deterministic fallback; uniqueness enforced at confirm time | [ ] | A2, E5 |  |  |
+| 3.2.6 | Match new lines of the same bill against each other | [ ] | E5 |  |  |
 
----
+## Part 3.3 — Confirm and receipts API  (0 / 6)
 
-**Phase 2 Completion Checklist:**
-- [x] Can upload a real bill photo and get back extracted line items
-- [x] Can scan a barcode with laptop webcam and find the material
-- [x] Confirming a GR updates inventory quantities in Supabase
-- [x] Price history table gets new rows on every GR confirmation
-- [x] GR history screen shows all receipts with correct status
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 3.3.1 | POST /intake/confirm calls the transactional RPC; returns GR number and totals | [ ] | E2, E3, E6 |  |  |
+| 3.3.2 | Server-side validation: date default, quantity > 0, location exists, quality in A/B/C | [ ] | E1, E3 |  |  |
+| 3.3.3 | Idempotency key to prevent double-submit creating two receipts | [ ] | E3 |  |  |
+| 3.3.4 | GET /intake/receipts with vendor/status/date filters, gr_number, vendor name, total | [ ] | E9, E10 |  |  |
+| 3.3.5 | GET /intake/receipts/{id} with line items and material details | [ ] | E8 |  |  |
+| 3.3.6 | Approve/reject mapping endpoints use the RPC, require status = pending, write audit | [ ] | E12 |  |  |
 
----
+## Part 3.4 — Intake UI  (0 / 12)
 
----
-
-# PHASE 3 — AI Core
-**Target:** Days 4–5  
-**Status:** 🟢 Completed  
-**Steps Complete:** 19 / 19
-
----
-
-## Part 3.1 — Embedding Service
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 3.1.1 | Integrate Gemini text-embedding-004 in FastAPI | [x] | Model: models/text-embedding-004, output dimension: 768 |
-| 3.1.2 | Build embedding generation for incoming material descriptions | [x] | Concatenate: description + key specs into one string before embedding |
-| 3.1.3 | Build pgvector cosine similarity search | [x] | SELECT ... ORDER BY embedding <=> $1 LIMIT 5 |
-| 3.1.4 | Set similarity thresholds (exact / near-dup / new) | [x] | >0.95 = exact, 0.75–0.95 = near-dup, <0.75 = new. Tune with seed data |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 3.4.1 | Default receipt date to today; validate before submit with inline errors | [ ] | E1 |  |  |
+| 3.4.2 | Show real backend error messages in toasts | [ ] | E1 |  |  |
+| 3.4.3 | After confirm: show GR number and navigate to the receipt detail | [ ] | E1, E10 |  |  |
+| 3.4.4 | Recompute line totals on edit; guard NaN; require quantity > 0 | [ ] | E7 |  |  |
+| 3.4.5 | Send edited description/CNMC in the confirm payload and honour it server-side | [ ] | E6 |  |  |
+| 3.4.6 | Cancel without page reload; clear file state; discard the draft cleanly | [ ] | E4, E14 |  |  |
+| 3.4.7 | Receipt History: working filters, correct status values, detail panel with its own state | [ ] | E8, E9, E10 |  |  |
+| 3.4.8 | Home page: open the clicked receipt via ?id; fix status colour map | [ ] | E9, E11 |  |  |
+| 3.4.9 | Pending Approvals: error toasts and result summary after approve/reject | [ ] | E12 |  |  |
+| 3.4.10 | Barcode tab: location dropdown, shared vendor/date header, stable onDecode, real new-material path | [ ] | E13 |  |  |
+| 3.4.11 | Separate OCR and barcode draft state | [ ] | E14 |  |  |
+| 3.4.12 | Locations page: implement a real read-only list, or hide the menu item | [ ] | E15 | ❓ Decision |  |
 
 ---
 
-## Part 3.2 — Material Matching Engine
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+# Phase 4 — Natural-Language Query (real Gemini)
+**Steps complete:** 0 / 10
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 3.2.1 | Build matching_service with pgvector top-5 candidate retrieval | [x] | Returns list of (material_id, similarity_score) tuples |
-| 3.2.2 | Build Gemini scoring prompt for each candidate pair | [x] | See architecture.md §12 for prompt. Returns match_type + confidence + reason |
-| 3.2.3 | Build matching_queue insert logic per result | [x] | Insert one row per candidate that passes minimum threshold |
-| 3.2.4 | Wire matching as a FastAPI BackgroundTask on every new material intake | [x] | Non-blocking — intake response returns immediately, matching runs in background |
-| 3.2.5 | Build auto-resolution for high-confidence exact matches | [x] | If confidence > 0.95 and match_type = exact: auto-flag without human review |
+## Part 4.1 — NL→SQL service  (0 / 7)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 4.1.1 | LLM provider abstraction: Gemini by default; Ollama (Mistral or DeepSeek) as demo fallback | [ ] | G1 | ❓ Decision | Deployed-demo hosting of Ollama is an open question (D-5). |
+| 4.1.2 | Schema-aware prompt limited to approved views with column descriptions and examples | [ ] | G1 | 🌐 Quota |  |
+| 4.1.3 | SQL safety validator: single SELECT, allow-listed views, forced LIMIT, no functions/comments | [ ] | G1 |  |  |
+| 4.1.4 | Executor uses the read-only role/RPC with a statement timeout | [ ] | G1 |  |  |
+| 4.1.5 | Free-tier protection: per-user rate limit, result cache, daily request budget, graceful fallback | [ ] | G1 | 🌐 Quota |  |
+| 4.1.6 | Log every query with provider, latency, success/error into nl_query_log | [ ] | G4, G1 | 🔒 DB | Writes rows at runtime via the app. |
+| 4.1.7 | User-friendly error and no-result handling | [ ] | G1 |  |  |
 
-## Part 3.3 — CNMC Generator
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+## Part 4.2 — NL query UI  (0 / 3)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 3.3.1 | Build CNMC generation prompt with category tree | [x] | See architecture.md §12. Category tree hardcoded in prompt |
-| 3.3.2 | Build CNMC parser and validator (format check) | [x] | Regex: ^[A-Z]{2,6}-[A-Z]{2,6}-[A-Z]{2,6}-[A-Z0-9]{2,8}-[ABC]$ |
-| 3.3.3 | Build uniqueness check against existing CNMCs | [x] | SELECT from materials WHERE cnmc = generated_cnmc |
-| 3.3.4 | Build collision handler (append suffix if CNMC already exists) | [x] | e.g. MECH-FSTNR-BOLT-M8X25-SS304-A already exists → MECH-FSTNR-BOLT-M8X25-SS304-A2 |
-| 3.3.5 | Wire CNMC generation into new material intake flow | [x] | Called after OCR extraction, before returning results to frontend |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 4.2.1 | Fix API base URL usage (single API client, no optional-chained import.meta.env) | [ ] | G2 |  |  |
+| 4.2.2 | Show real phases and the provider that answered; remove the fake 'Generating SQL with Gemini' text | [ ] | G1 |  |  |
+| 4.2.3 | Persistent query history loaded from nl_query_log; remove the client-side insert | [ ] | G4 |  |  |
 
 ---
 
-## Part 3.4 — Approval Workflow
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+# Phase 5 — Engineer Dashboard
+**Steps complete:** 0 / 9
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 3.4.1 | Build pending approvals list endpoint | [x] | GET /matching?status=pending — returns queue with both materials' full details |
-| 3.4.2 | Build approve-mapping endpoint (merge quantities, deprecate duplicate) | [x] | PATCH /matching/{id}/approve — sets canonical material, transfers qty, deprecates duplicate |
-| 3.4.3 | Build reject-mapping endpoint (proceed as new material) | [x] | PATCH /matching/{id}/reject — new material proceeds independently |
-| 3.4.4 | Build Pending Approvals screen (Entry dashboard) | [x] | Card per queue item: side-by-side material comparison, confidence bar, reason, approve/reject buttons |
-| 3.4.5 | Build approval confirmation with audit log write | [x] | Every approve/reject writes to audit_log with actor, action, old/new values |
+## Part 5.1 — Home, map, catalog, detail  (0 / 9)
 
----
-
-**Phase 3 Completion Checklist:**
-- [x] New material intake triggers background matching job automatically
-- [x] Matching queue populates with correct match types and confidence scores
-- [x] CNMC is generated for every new material before results return to frontend
-- [x] Entry operator can approve or reject each match from the UI
-- [x] Approving a duplicate correctly merges stock and deprecates the duplicate
-- [x] Every approval/rejection is written to audit_log
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 5.1.1 | Engineer Home: correct columns, low-stock from v_low_stock_alerts / reorder levels | [ ] | G3 |  |  |
+| 5.1.2 | Decide whether engineers may see pending materials (RLS) or the KPIs are relabelled | [ ] | G7 | ❓ Decision |  |
+| 5.1.3 | Inventory map built from locations (empty bins shown) joined with inventory | [ ] | G5 |  |  |
+| 5.1.4 | Bin colours from each row's reorder_level and max_stock | [ ] | G5 |  |  |
+| 5.1.5 | Realtime updates working, or remove the 'Live' label | [ ] | G5 | ❓ Decision |  |
+| 5.1.6 | Catalog category tree loaded from the database (matches CNMC tree, includes CIVIL) | [ ] | G6 |  |  |
+| 5.1.7 | Real debounce, page reset on search, safe escaping of search text | [ ] | G6 |  |  |
+| 5.1.8 | Material detail route: specs, inventory by bin, price history | [ ] | G6 |  | May reuse the layout of shrindhi MaterialDetail (D-4). |
+| 5.1.9 | Equivalent materials via an access-safe RPC, both directions | [ ] | G6, G7 |  |  |
 
 ---
 
----
+# Phase 6 — Accounts Dashboard on Real Data
+**Steps complete:** 0 / 14
 
-# PHASE 4 — Engineering Dashboard
-**Target:** Day 6  
-**Status:** 🟢 Completed
-**Steps Complete:** 18 / 18
+## Part 6.1 — API  (0 / 7)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 6.1.1 | Price comparison per material per vendor endpoint | [ ] | C1, B8 |  |  |
+| 6.1.2 | Vendor ranking and savings calculation | [ ] | C1 |  |  |
+| 6.1.3 | Savings opportunities endpoint | [ ] | C1 |  |  |
+| 6.1.4 | Stock valuation by category using the latest price | [ ] | C1, C3 |  |  |
+| 6.1.5 | Aging inventory endpoint (90/180/365 days) | [ ] | C1 |  |  |
+| 6.1.6 | Vendor scorecard endpoint (price, quality, volume) | [ ] | C1 |  |  |
+| 6.1.7 | Purchase history endpoint with filters and pagination | [ ] | C1 |  |  |
 
-## Part 4.1 — NL→SQL Service
-**Status:** 🟢 Completed
-**Owner:** —  
-**Notes:** —
+## Part 6.2 — UI  (0 / 7)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 4.1.1 | Build NL→SQL Gemini prompt with schema context | [x] | See architecture.md §12. Include all relevant table schemas in prompt |
-| 4.1.2 | Build SQL safety validator (SELECT only, no mutations) | [x] | Parse returned SQL, reject if contains: INSERT, UPDATE, DELETE, DROP, TRUNCATE, ALTER |
-| 4.1.3 | Build safe query executor against Supabase | [x] | Use supabase-py .rpc() or direct postgres connection via asyncpg |
-| 4.1.4 | Build nl_query_log insert on every query | [x] | Log: user_id, query, generated_sql, result_count, execution_time_ms, was_successful |
-| 4.1.5 | Build error handling for invalid SQL | [x] | Return user-friendly error + fallback message if SQL fails or returns no results |
-
----
-
-## Part 4.2 — NL Query UI
-**Status:** 🟢 Completed
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 4.2.1 | Build NL query search bar with example placeholders | [x] | Cycling placeholder text: "Where are M8 bolts?", "How many gate valves in stock?", "Which bin has pipe fittings?" |
-| 4.2.2 | Build loading and streaming state | [x] | Two-phase: "Generating query..." then "Fetching results..." |
-| 4.2.3 | Build results table with material + location columns | [x] | Columns: Material, CNMC, Warehouse, Aisle, Rack, Bin, Qty Available, Unit |
-| 4.2.4 | Build SQL reveal (collapsible) with explanation | [x] | Accordion below results: shows generated SQL + plain English explanation |
-| 4.2.5 | Build query history panel | [x] | Right sidebar: last 10 queries, click to re-run |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 6.2.1 | Accounts Home from real endpoints | [ ] | C1 |  |  |
+| 6.2.2 | Price Intelligence from real endpoints | [ ] | C1 |  |  |
+| 6.2.3 | Stock Valuation from real endpoints (real locations) | [ ] | C1, C2 |  |  |
+| 6.2.4 | Vendor Analysis from real endpoints | [ ] | C1 |  |  |
+| 6.2.5 | Purchase History from real endpoints | [ ] | C1 |  |  |
+| 6.2.6 | Delete mockAccountsData.js and its utilities | [ ] | C2 | 🗑 Delete |  |
+| 6.2.7 | Loading, empty and error states on all Accounts pages | [ ] | C1 |  |  |
 
 ---
 
-## Part 4.3 — Material Catalog & Detail
-**Status:** 🟢 Completed
-**Owner:** —  
-**Notes:** —
+# Phase 7 — Admin Dashboard
+**Steps complete:** 0 / 12
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 4.3.1 | Build material catalog with category filter tree | [x] | Left panel: MECH > FSTNR / PIPE / VALVE etc. Clicking filters results |
-| 4.3.2 | Build material search (description + CNMC) | [x] | Search hits standard_description and cnmc columns |
-| 4.3.3 | Build material detail page (specs, inventory, price history) | [x] | Route: /engineer/materials/:id — full specs JSONB rendered as table |
-| 4.3.4 | Build related/equivalent materials section | [x] | Pull from matching_queue where match approved and match_type = equivalent |
+## Part 7.1 — Material governance  (0 / 3)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 7.1.1 | Backend endpoints: approve, deprecate, bulk, edit, merge — each with audit, approved_by/at, deprecated_* fields | [ ] | M4, B8 |  |  |
+| 7.1.2 | Governance UI calls the backend; confirmation dialogs for bulk actions | [ ] | M4 |  |  |
+| 7.1.3 | Server-side pagination and safe search | [ ] | M4 |  |  |
 
-## Part 4.4 — Inventory Map
-**Status:** 🟢 Completed
-**Owner:** —  
-**Notes:** —
+## Part 7.2 — Audit trail  (0 / 2)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 4.4.1 | Build warehouse grid layout component | [x] | CSS Grid: warehouses as columns, aisles as rows, racks and bins as sub-cells |
-| 4.4.2 | Build bin color coding (stock level status) | [x] | Green (>50% of max), Yellow (reorder level to 50%), Red (<reorder level), Grey (empty) |
-| 4.4.3 | Build bin click → show stored materials | [x] | Slide-out panel: list of materials at that bin with quantities |
-| 4.4.4 | Connect to live inventory data | [x] | Use Supabase Realtime subscription for live stock updates |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 7.2.1 | Audit query endpoint (paginated; filters: actor, action, entity, date range) | [ ] | M2, M7, B8 |  |  |
+| 7.2.2 | Audit UI: correct columns, action/entity values from the data, date filter, actor names, escaped CSV | [ ] | M2, M7 |  |  |
 
----
+## Part 7.3 — Duplicate detection  (0 / 3)
 
-**Phase 4 Completion Checklist:**
-- [x] NL query returns correct results for at least 10 different natural language questions
-- [x] SQL is always SELECT only (test with "delete all materials" — must reject)
-- [x] Material catalog filters correctly by category tree
-- [x] Inventory map renders all 3 warehouses with correct color coding
-- [x] Clicking a bin shows correct materials stored there
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 7.3.1 | Matching stats endpoint and queue listing with correct columns/statuses | [ ] | M1, B8 |  |  |
+| 7.3.2 | Merge / reject actions via the approve_mapping RPC with audit | [ ] | M1 |  |  |
+| 7.3.3 | Duplicate detection UI rewired to the new endpoints | [ ] | M1 |  |  |
 
----
+## Part 7.4 — Users and system health  (0 / 4)
+
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 7.4.1 | Admin-only create-user endpoint (auth user + profile) and role change with audit | [ ] | M3, B8 |  |  |
+| 7.4.2 | User list with correct columns; prevent self-deactivation; enforce is_active | [ ] | M3, B4 |  |  |
+| 7.4.3 | System health: real DB, Gemini/Ollama status, recent errors, table sizes | [ ] | M6 |  |  |
+| 7.4.4 | Admin Home KPIs computed correctly (duplicates, data quality) | [ ] | M5 |  |  |
 
 ---
 
-# PHASE 5 — Accounts Dashboard
-**Target:** Day 7  
-**Status:** 🟢 Completed  
-**Steps Complete:** 14 / 14
+# Phase 8 — One Consistent Dataset
+**Steps complete:** 0 / 11
+
+## Part 8.1 — Design and script  (0 / 5)
+
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 8.1.1 | Write the dataset specification for review (vendors, locations, materials, receipts, price history, matches, audit) | [ ] |  | ❓ Decision |  |
+| 8.1.2 | Idempotent seed script where inventory, price_history and audit rows are derived from the receipts | [ ] |  |  |  |
+| 8.1.3 | Dry-run mode that prints what would change without contacting the database | [ ] |  |  |  |
+| 8.1.4 | Remove the random seed_demo_data.py after replacement | [ ] |  | 🗑 Delete |  |
+| 8.1.5 | Demo bill images generated from the dataset's own materials and vendors | [ ] |  |  |  |
+
+## Part 8.2 — Apply to the database (one approval per action)  (0 / 6)
+
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 8.2.1 | Plan cleanup of existing random demo rows (list exactly what will be removed) | [ ] |  | 🔒 DB 🗑 Delete |  |
+| 8.2.2 | Apply cleanup | [ ] |  | 🔒 DB 🗑 Delete |  |
+| 8.2.3 | Apply dataset | [ ] |  | 🔒 DB |  |
+| 8.2.4 | Generate embeddings for the dataset (quota-aware) | [ ] | A5 | 🔒 DB 🌐 Quota |  |
+| 8.2.5 | Run consistency verification queries (inventory = receipts, prices = lines, etc.) | [ ] |  | 🔒 DB |  |
+| 8.2.6 | Reset demo account passwords | [ ] | S3 | 🔒 DB |  |
 
 ---
 
-## Part 5.1 — Price Comparison Engine
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+# Phase 9 — Frontend Structure, Session & Quality
+**Steps complete:** 0 / 11
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 5.1.1 | Build price history aggregation endpoint per material per vendor | [x] | GET /pricing/comparison/:material_id — avg, min, max, last price per vendor |
-| 5.1.2 | Build vendor ranking logic (avg price + quality score) | [x] | Score = weighted avg of (normalized_price * 0.6) + (quality_a_pct * 0.4) |
-| 5.1.3 | Build savings calculator (best vendor vs current vendor delta) | [x] | (current_avg - best_avg) * annual_volume = projected savings |
-| 5.1.4 | Build bulk savings opportunities endpoint | [x] | GET /pricing/opportunities — all materials where switching vendor saves >5% |
+## Part 9.1 — Structure and session  (0 / 6)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 9.1.1 | Move a_p/ pages into arya_frontend/src and fix imports (no cross-tree imports) | [ ] | Q1 |  |  |
+| 9.1.2 | shrindhi/: port anything still needed (MaterialDetail layout), then remove the app | [ ] | Q2 | ❓ Decision 🗑 Delete | Decision D-4; removal needs approval. |
+| 9.1.3 | Single API client with token refresh and 401 handling | [ ] | S1 |  |  |
+| 9.1.4 | Use Supabase session state (listener) instead of the mock_auth copy; document token-storage choice | [ ] | S1, S2 |  |  |
+| 9.1.5 | Login: real full name from profile; correct placeholder | [ ] | S3 |  |  |
+| 9.1.6 | Landing page: live stats from the database; remove unverifiable claims | [ ] | L1 |  |  |
 
-## Part 5.2 — Price Intelligence UI
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+## Part 9.2 — Quality  (0 / 5)
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 5.2.1 | Build material selector with search | [x] | Searchable dropdown — type to filter by material description or CNMC |
-| 5.2.2 | Build vendor comparison table with recommendation badge | [x] | Columns: Vendor, Avg Price, Last Price, Min Price, Purchases, Quality A%, Recommended |
-| 5.2.3 | Build price trend chart (Recharts line chart, per vendor) | [x] | X: month, Y: unit price. One line per vendor. Legend with vendor names |
-| 5.2.4 | Build savings calculator display | [x] | "Switch to [Vendor A] → Save ₹X per unit → ₹Y annually" |
-| 5.2.5 | Build "Switch vendor, save ₹X" alert cards on home | [x] | Top 5 savings opportunities as alert cards on Accounts home |
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 9.2.1 | ESLint config and a clean lint run | [ ] | Q3 |  |  |
+| 9.2.2 | Route-level code splitting | [ ] | Q3 |  |  |
+| 9.2.3 | Frontend tests (Vitest + Testing Library) for intake, auth and approvals | [ ] | Q3 |  |  |
+| 9.2.4 | README, env documentation, remove stray files and the empty root lockfile | [ ] | Q5 | 🗑 Delete |  |
+| 9.2.5 | Consistent toast/error handling across pages | [ ] | E1, M4 |  |  |
 
 ---
 
-## Part 5.3 — Stock Valuation & Vendor Analysis
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
+# Phase 10 — Verification & Deployment
+**Steps complete:** 0 / 8
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 5.3.1 | Build total inventory value by category endpoint | [x] | JOIN inventory + price_history (latest price) + materials GROUP BY category |
-| 5.3.2 | Build aging inventory endpoint (90/180/365 days no movement) | [x] | Materials with no GR line items in last N days |
-| 5.3.3 | Build stock valuation screen (pie chart + table) | [x] | Recharts PieChart by category value + breakdown table below |
-| 5.3.4 | Build vendor scorecard endpoint (price + quality + volume) | [x] | Aggregate across all materials: avg price rank, avg quality %, total purchase volume |
-| 5.3.5 | Build vendor analysis screen | [x] | Table of all vendors with score columns + click to drill into per-vendor material list |
+## Part 10.1 — Verification  (0 / 4)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 10.1.1 | Regression pass: re-test every audit ID and record the result in progress.md | [ ] |  |  |  |
+| 10.1.2 | End-to-end run for all 4 roles on real data | [ ] |  |  |  |
+| 10.1.3 | Mobile-width pass on all dashboards | [ ] |  |  |  |
+| 10.1.4 | Free-tier stress check of OCR + NL query flows | [ ] |  | 🌐 Quota |  |
 
-**Phase 5 Completion Checklist:**
-- [x] Price comparison shows correct avg/min/max per vendor for any material
-- [x] Savings calculator shows accurate projected annual saving
-- [x] Price trend chart renders with correct data points over 6 months
-- [x] Stock valuation totals match manual calculation from seed data
-- [x] Vendor scorecards reflect actual purchase history quality grades
+## Part 10.2 — Deployment (nothing is pushed without approval)  (0 / 4)
 
----
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 10.2.1 | Frontend deployment config and env vars | [ ] | Q1 | ❓ Decision |  |
+| 10.2.2 | Backend deployment config and env vars; health endpoint | [ ] |  | ❓ Decision |  |
+| 10.2.3 | Push to GitHub | [ ] |  | ❓ Decision | Only with explicit approval. |
+| 10.2.4 | Production smoke test and final demo rehearsal | [ ] |  |  |  |
 
 ---
 
-# PHASE 6 — Admin Dashboard
-**Target:** Day 8  
-**Status:** 🟢 Completed  
-**Steps Complete:** 16 / 16
+## Audit findings status
 
----
+A finding is **Closed** only when every step that references it is `[x]` and the fix was re-tested in step 10.1.1.
 
-## Part 6.1 — Material Governance
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** UI built in a_p/pages/MaterialGovernance.jsx — directly queries materials table via Supabase client
+| Finding | Steps | Status |
+|---|---|---|
+| E1 | 3.3.2, 3.4.1, 3.4.2, 3.4.3, 9.2.5 | Open |
+| E2 | 1.2.2, 3.3.1 | Open |
+| E3 | 1.2.2, 3.3.1, 3.3.2, 3.3.3 | Open |
+| E4 | 3.1.4, 3.4.6 | Open |
+| E5 | 1.2.2, 3.1.4, 3.2.5, 3.2.6 | Open |
+| E6 | 1.2.2, 3.3.1, 3.4.5 | Open |
+| E7 | 3.4.4 | Open |
+| E8 | 3.3.5, 3.4.7 | Open |
+| E9 | 3.3.4, 3.4.7, 3.4.8 | Open |
+| E10 | 3.3.4, 3.4.3, 3.4.7 | Open |
+| E11 | 3.4.8 | Open |
+| E12 | 1.2.3, 3.3.6, 3.4.9 | Open |
+| E13 | 3.4.10 | Open |
+| E14 | 3.1.6, 3.4.6, 3.4.11 | Open |
+| E15 | 3.4.12 | Open |
+| B1 | 2.1.5 | Open |
+| B2 | 2.1.7 | Open |
+| B3 | 2.1.3 | Open |
+| B4 | 2.1.2, 7.4.2 | Open |
+| B5 | 2.1.1 | Open |
+| B6 | 2.1.4 | Open |
+| B7 | 2.2.1, 2.2.2 | Open |
+| B8 | 1.2.5, 1.2.6, 2.2.6, 6.1.1, 7.1.1, 7.2.1, 7.3.1, 7.4.1 | Open |
+| B9 | 2.2.4, 2.2.5 | Open |
+| B10 | 2.1.6 | Open |
+| A1 | 3.1.1, 3.1.2 | Open |
+| A2 | 3.1.3, 3.2.5 | Open |
+| A3 | 2.2.3, 3.2.1 | Open |
+| A4 | 3.2.2 | Open |
+| A5 | 2.2.4, 3.2.3, 8.2.4 | Open |
+| A6 | 3.2.4 | Open |
+| A7 | 1.2.2, 2.2.1, 3.1.4 | Open |
+| A8 | 3.1.5, 3.1.6 | Open |
+| G1 | 1.2.4, 4.1.1, 4.1.2, 4.1.3, 4.1.4, 4.1.5, 4.1.6, 4.1.7, 4.2.2 | Open |
+| G2 | 4.2.1 | Open |
+| G3 | 5.1.1 | Open |
+| G4 | 4.1.6, 4.2.3 | Open |
+| G5 | 0.3.4, 1.2.7, 5.1.3, 5.1.4, 5.1.5 | Open |
+| G6 | 5.1.6, 5.1.7, 5.1.8, 5.1.9 | Open |
+| G7 | 5.1.2, 5.1.9 | Open |
+| C1 | 1.2.5, 6.1.1, 6.1.2, 6.1.3, 6.1.4, 6.1.5, 6.1.6, 6.1.7, 6.2.1, 6.2.2, 6.2.3, 6.2.4, 6.2.5, 6.2.7 | Open |
+| C2 | 6.2.3, 6.2.6 | Open |
+| C3 | 1.2.5, 6.1.4 | Open |
+| M1 | 7.3.1, 7.3.2, 7.3.3 | Open |
+| M2 | 7.2.1, 7.2.2 | Open |
+| M3 | 7.4.1, 7.4.2 | Open |
+| M4 | 7.1.1, 7.1.2, 7.1.3, 9.2.5 | Open |
+| M5 | 1.2.6, 7.4.4 | Open |
+| M6 | 1.2.6, 7.4.3 | Open |
+| M7 | 7.2.1, 7.2.2 | Open |
+| D1 | 0.3.2, 1.1.1, 1.1.2 | Open |
+| D2 | 0.3.1, 1.1.3 | Open |
+| D3 | 0.3.3, 1.1.4, 1.1.5, 1.1.6 | Open |
+| D4 | 0.3.5, 1.2.8 | Open |
+| D5 | 1.2.1 | Open |
+| S1 | 9.1.3, 9.1.4 | Open |
+| S2 | 9.1.4 | Open |
+| S3 | 8.2.6, 9.1.5 | Open |
+| Q1 | 9.1.1, 10.2.1 | Open |
+| Q2 | 9.1.2 | Open |
+| Q3 | 2.2.7, 9.2.1, 9.2.2, 9.2.3 | Open |
+| Q4 | 0.2.3 | Open |
+| Q5 | 0.2.1, 9.2.4 | Open |
+| L1 | 9.1.6 | Open |
+| P1 | 0.1.1, 0.1.3 | Open |
 
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 6.1.1 | Build material list with all statuses (pending/approved/deprecated) | [x] | Live from Supabase — status filter tabs, search by CNMC/description |
-| 6.1.2 | Build single material approve/deprecate endpoints | [x] | Direct Supabase UPDATE per row — action buttons per material |
-| 6.1.3 | Build bulk approve endpoint | [x] | Checkbox multi-select + bulk approve/deprecate bar |
-| 6.1.4 | Build material edit endpoint (description, specs, CNMC) with audit | [x] | Inline editable description field with save/cancel — writes via Supabase client |
-| 6.1.5 | Build material merge endpoint (deprecate + transfer inventory) | [x] | Deprecate action wired; full merge via backend endpoint pending |
-| 6.1.6 | Build governance screen UI | [x] | Full table UI with filters, bulk actions, inline edit, status badges |
+## Blockers
 
----
-
-## Part 6.2 — Audit Trail
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** UI built in a_p/pages/AuditTrail.jsx — paginated live data from audit_log table
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 6.2.1 | Build audit log query endpoint (paginated, filterable) | [x] | Paginated directly from Supabase; filters on action, entity_type |
-| 6.2.2 | Build audit trail screen with filters | [x] | Filter dropdowns (action, entity type), search, CSV export, pagination |
-| 6.2.3 | Build entity-level audit view (history for one material/GR) | [x] | Expandable "View changes" row showing new_values JSON |
-
----
-
-## Part 6.3 — Duplicate Detection Overview
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** UI built in a_p/pages/DuplicateDetection.jsx — live from matching_queue table
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 6.3.1 | Build matching queue stats endpoint | [x] | Live count cards for total/pending/auto-resolved/rejected from Supabase |
-| 6.3.2 | Build duplicate families grouping query | [x] | Match type displayed per item (exact/near_duplicate) with similarity score bars |
-| 6.3.3 | Build duplicate detection screen with bulk review | [x] | Status filter tabs, per-row Merge/Reject actions, similarity score progress bars |
-
----
-
-## Part 6.4 — User Management & System Health
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** UI built in a_p/pages/UserManagement.jsx and a_p/pages/SystemHealth.jsx
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 6.4.1 | Build user list + create user endpoints | [x] | Live from profiles table; create user modal wired via Supabase client |
-| 6.4.2 | Build user management screen | [x] | Role count cards, search, deactivate/reactivate per user, create user modal |
-| 6.4.3 | Build system health stats endpoint | [x] | DB ping latency + row counts for all 5 key tables |
-| 6.4.4 | Build system health screen | [x] | Connectivity cards (ping, connection, pgvector), stat cards, Gemini usage notice |
-
----
-
-**Phase 6 Completion Checklist:**
-- [x] Admin can approve / deprecate materials from UI
-- [x] Audit trail screen live with filter by action + entity type
-- [x] Duplicate detection screen shows counts per match type with merge/reject
-- [x] User management can create a new user with role assignment
-- [x] System health shows live DB ping and table row counts
-
----
-
----
-
-# PHASE 7 — Landing Page & Polish
-**Target:** Day 9  
-**Status:** 🟡 In Progress  
-**Steps Complete:** 9 / 13
-
----
-
-## Part 7.1 — Landing Page
-**Status:** 🟢 Completed  
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 7.1.1 | Build hero section with CNMC animation | [x] | Animated text showing material name → standardized → CNMC code generated |
-| 7.1.2 | Build live stats section (pulls from admin dashboard endpoint) | [x] | Cards: Materials catalogued, Duplicates detected, Cost savings identified |
-| 7.1.3 | Build capabilities section (6 feature cards) | [x] | OCR Intake, AI Matching, NL Query, Price Intelligence, Quality Tracking, Audit Trail |
-| 7.1.4 | Build problem statement section with impact numbers | [x] | "₹X wasted on duplicate procurement. Y% of material codes are redundant." |
-
----
-
-## Part 7.2 — Polish & Edge Cases
-**Status:** 🟢 Completed
-**Owner:** —  
-**Notes:** Page fade-in transitions on all dashboards; ErrorBoundary at root; mobile sidebar (hamburger + backdrop + close-on-nav) on all 4 roles; shared EmptyState component; skeleton-shimmer CSS utility; scroll-behavior: smooth
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 7.2.1 | Add loading skeletons to all data-fetching screens | [x] | skeleton-shimmer CSS class added; Shadcn Skeleton already present |
-| 7.2.2 | Add empty states to all list screens | [x] | Shared EmptyState component at a_p/EmptyState.jsx |
-| 7.2.3 | Add error boundaries and toast notifications | [x] | ErrorBoundary at root in main.jsx; Toaster already wired; use-toast.js hook ready |
-| 7.2.4 | Mobile responsive pass on all dashboards | [x] | All 4 sidebars hidden on mobile; md:ml-60 on all content wrappers; tables already overflow-x-auto |
-| 7.2.5 | Sidebar collapse on small screens | [x] | Hamburger trigger + slide-out overlay on all 4 dashboards (Entry, Engineer, Accounts, Admin) |
-
----
-
-## Part 7.3 — Demo Preparation
-**Status:** 🟡 In Progress
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 7.3.1 | Create 3 realistic BharatOil bill images for OCR demo | [x] | Generated via Arpit_Backend/generate_demo_bills.py — 3 PNG invoices in demo_assets/bills/ (FastFix fasteners, ElectroCore motors/cable, LubriMax lubricants/PPE), using real seeded material descriptions incl. the BOLT-B duplicate wording for the matching demo |
-| 7.3.2 | Pre-seed matching queue with pending duplicates for demo | [x] | matching_queue now has 3 pending + 1 approved pair (gate valve CL150 vs PN16 near-dup, 5HP motor near-dup, plus the original BOLT-A/B pair) |
-| 7.3.3 | Rehearse full 3-minute demo narrative end to end | [ ] | Narrative in architecture.md §17 verified against live data — the ₹11.80/₹14.20 M8 bolt vendor price gap it references is real seeded data. Actual click-through rehearsal still needs a human pass |
-| 7.3.4 | Prepare demo user accounts (one per role, easy passwords) | [!] | 4 real accounts exist (admin/engineer/accounts/operator@bharatoil.in). Password reset to Demo@1234 blocked by sandbox (secret-store write) — run Arpit_Backend/demo_prep2.py yourself, or reset manually in Supabase dashboard |
-
----
-
-**Phase 7 Completion Checklist:**
-- [ ] Landing page loads in under 2 seconds
-- [ ] Live stats on landing page show real numbers from the database
-- [ ] No screen shows a blank white flash while loading
-- [ ] All screens tested at mobile width (375px) without layout breaking
-- [ ] Full demo run-through completed in under 4 minutes
-
----
-
----
-
-# PHASE 8 — Deployment
-**Target:** Day 10  
-**Status:** 🟡 In Progress
-**Steps Complete:** 0 / 14
-
----
-
-## Part 8.1 — Deploy Frontend
-**Status:** 🟡 In Progress
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 8.1.1 | Push React app to GitHub | [ ] | |
-| 8.1.2 | Connect GitHub repo to Vercel | [ ] | Import project, set root directory to frontend/ |
-| 8.1.3 | Set VITE_ environment variables in Vercel dashboard | [ ] | VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_API_BASE_URL |
-| 8.1.4 | Deploy and verify all routes work | [ ] | Test: /, /login, /entry, /engineer, /accounts, /admin |
-
----
-
-## Part 8.2 — Deploy Backend
-**Status:** 🟡 In Progress
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 8.2.1 | Push FastAPI app to GitHub | [ ] | Include requirements.txt and Procfile: `web: uvicorn main:app --host 0.0.0.0 --port $PORT` |
-| 8.2.2 | Connect repo to Render, set as Python web service | [ ] | Runtime: Python 3.11, Build: `pip install -r requirements.txt` |
-| 8.2.3 | Set environment variables in Render dashboard | [ ] | SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY, ALLOWED_ORIGINS |
-| 8.2.4 | Deploy and verify health endpoint + all API routes | [ ] | GET /health should return 200. Test /auth/login from Postman |
-
----
-
-## Part 8.3 — Final Checks
-**Status:** 🟡 In Progress
-**Owner:** —  
-**Notes:** —
-
-| # | Step | Status | Notes |
-|---|---|---|---|
-| 8.3.1 | Test full OCR intake flow on deployed URLs | [ ] | Upload real bill image → verify extraction → confirm receipt → check inventory updated |
-| 8.3.2 | Test barcode scanning on deployed frontend | [ ] | Webcam must work on HTTPS (Vercel provides this) |
-| 8.3.3 | Test NL→SQL on deployed stack end to end | [ ] | 5 different queries, verify results match expected |
-| 8.3.4 | Test all 4 role logins and dashboard access | [ ] | Each role can only see their dashboard, not others |
-| 8.3.5 | Verify audit trail capturing all actions | [ ] | Do 5 actions, verify all 5 appear in audit log immediately |
-| 8.3.6 | Final demo run-through on production URLs | [ ] | Full 3-min demo on live deployed app. No localhost |
-
----
-
-**Phase 8 Completion Checklist:**
-- [ ] Frontend live on Vercel with custom URL
-- [ ] Backend live on Render, health endpoint returns 200
-- [ ] Barcode scanning works on HTTPS deployed URL
-- [ ] All 4 roles log in successfully on production
-- [ ] Full demo run-through completed on production URLs
-- [ ] No console errors on any dashboard
-
----
-
----
-
-## BLOCKERS LOG
-
-*Add blockers here as they come up. Remove when resolved.*
-
-| Date | Blocker | Affected Steps | Resolution |
+| Date | Blocker | Affected steps | Resolution |
 |---|---|---|---|
 | — | — | — | — |
 
----
+## Session log
 
-## DECISIONS LOG
-
-*Record architectural decisions made during build that differ from plan.*
-
-| Date | Decision | Reason | Steps Affected |
-|---|---|---|---|
-| — | — | — | — |
-
----
-
-## DAILY NOTES
-
-### Day 1
-- 
-
-### Day 2
-- 
-
-### Day 3
-- 
-
-### Day 4
-- 
-
-### Day 5
-- 
-
-### Day 6
-- 
-
-### Day 7
-- 
-
-### Day 8
-- 
-
-### Day 9
-- 
-
-### Day 10
-- 
-
----
-
-*8 Phases | 31 Parts | 130 Steps | 10 Days*  
-*Update this file at the end of every work session.*
+### 2026-09-19
+- Full audit completed; `audit.md` written (65 findings).
+- `plan.md` and `progress.md` rewritten; the previous progress claim (116/130 done) was inaccurate and has been discarded.
+- No project code and no database was changed.
+- Plan order approved by the user. Pre-audit working tree committed locally as `5cedcce` (step 0.2.3); nothing pushed.

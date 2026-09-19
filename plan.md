@@ -1,238 +1,399 @@
-# Saarthi — Build Plan
-## BharatOil Demo | 10 Days
+# Saarthi — Fix Plan
+
+**Created:** 2026-09-19 · **Source:** `audit.md` (65 findings) · **Steps:** 146 in 11 phases
+
+This replaces the original build plan (still available in git history). Progress is tracked in `progress.md`; every step ID here has a row there.
+
+## Working rules (apply to every step)
+
+1. Nothing in the project is changed without the user's explicit go-ahead.
+2. No database read or write without the user's approval, one action at a time.
+3. plan.md (this file) and progress.md are kept current after every change.
+4. Production-grade code quality.
+5. No push to any remote without approval; local commits are fine.
+6. Nothing is assumed — ask whenever a decision is ambiguous or work is stuck.
+
+**Step flags:** 🔒 DB = touches the live database (needs approval per action) · ❓ Decision = needs a user decision first · 🗑 Delete = removes existing files/rows (needs approval) · 🌐 Quota = uses the Gemini free tier / external API
+
+**Refs** are audit finding IDs from `audit.md`.
 
 ---
 
-## PHASE 1 — Foundation
-*Days 1–2 | Everything the rest of the project depends on*
+## Decisions Log
 
-### Part 1.1 — Project Setup
-- Step 1: Initialize React + Vite + Tailwind + Shadcn
-- Step 2: Initialize FastAPI project with folder structure
-- Step 3: Set up environment variables for both frontend and backend
-- Step 4: Configure CORS, middleware, and health check endpoint
-
-### Part 1.2 — Supabase Setup
-- Step 1: Create Supabase project
-- Step 2: Run all table creation SQL (12 tables)
-- Step 3: Enable pgvector extension
-- Step 4: Write and apply RLS policies per role
-- Step 5: Create Supabase Storage bucket for bill images
-
-### Part 1.3 — Authentication
-- Step 1: Connect Supabase Auth to FastAPI (JWT validation middleware)
-- Step 2: Connect Supabase Auth to React (session management)
-- Step 3: Build Login page with role-based redirect
-- Step 4: Build ProtectedRoute component with role guard
-
-### Part 1.4 — Seed Data
-- Step 1: Seed vendors (10 vendors)
-- Step 2: Seed warehouse locations (3 warehouses, all aisles and bins)
-- Step 3: Seed 50+ materials with intentional duplicates and near-duplicates
-- Step 4: Generate and store embeddings for all seeded materials
-- Step 5: Seed inventory levels across locations
-- Step 6: Seed price history (6 months, multiple vendors per material)
-- Step 7: Seed user accounts for all 4 roles
+| ID | Status | Decision / question | Notes | Affects |
+|---|---|---|---|---|
+| D-1 | OPEN | Data-access pattern: send all reads and writes through FastAPI (audited, role-checked, one place for logic) or keep direct Supabase reads under RLS. | Recommended: FastAPI for all writes and anything needing audit or validation; direct Supabase reads only where RLS is verified sufficient. Needs your answer. | 0.2.1, Phases 5–7 |
+| D-2 | DECIDED | Every dashboard reads real database data; no mock or random data in the app. | Stated by the user. | Phase 6, 8 |
+| D-3 | DECIDED | One consistent dataset replaces the random seeds. | Stated by the user. | Phase 8 |
+| D-4 | DECIDED (approach) | shrindhi/: user said 'whatever is convenient'. Approach: port what is useful (MaterialDetail layout), then remove the app. Removal still needs explicit approval at that time. | Chosen as the least-effort route that loses nothing. | 5.1.8, 9.1.2 |
+| D-5 | DECIDED (partly open) | NL→SQL uses a real Gemini call within free-tier limits; Ollama with Mistral or DeepSeek as demo fallback. | Open: Ollama runs on a local machine, so a hosted (Render) demo cannot reach it unless it is tunnelled or hosted elsewhere. Needs your answer before 4.1.1. | Phase 4 |
+| D-6 | PROPOSED | OCR becomes a read-only draft; materials, matches, inventory and price history are created in one transaction only when the receipt is confirmed. New materials start as 'pending'. | Fixes E2, E3, E4, E5 together. Needs your approval before 3.1.4 and 1.2.2. | 3.1.4, 1.2.2, 3.3.1 |
+| D-7 | OPEN | Approval authority: which roles may approve materials and mappings (currently entry operator, engineer and admin). | Needs your answer before 2.1.6. | 2.1.6 |
+| D-8 | OPEN | Engineer visibility of pending materials, and whether the Entry 'Locations' page is built or hidden. | Needs your answer before 5.1.2 and 3.4.12. | 5.1.2, 3.4.12 |
 
 ---
 
-## PHASE 2 — Intake Pipeline
-*Days 3–4 | How stock enters the system*
+## Phase 0 — Governance, Decisions & Live-DB Baseline
 
-### Part 2.1 — OCR Service (Backend)
-- Step 1: Integrate Gemini Vision API in FastAPI
-- Step 2: Write OCR prompt template and parser
-- Step 3: Build bill image upload endpoint (save to Supabase Storage)
-- Step 4: Build OCR extraction endpoint returning structured line items
-- Step 5: Handle multi-page PDFs and image quality fallbacks
+*Everything that must be settled before code changes begin.*
 
-### Part 2.2 — OCR UI (Frontend)
-- Step 1: Build drag-and-drop bill upload component
-- Step 2: Build processing / loading state
-- Step 3: Build OCR results table (editable: qty, price, quality, location)
-- Step 4: Build match status badges (Exact / Near-Duplicate / New / Uncertain)
-- Step 5: Build "Confirm Receipt" flow and GR creation
+### Part 0.1 — Audit and project records
 
-### Part 2.3 — Barcode Scanner (Frontend + Backend)
-- Step 1: Integrate @zxing/browser webcam scanning
-- Step 2: Build scanning overlay UI with live camera feed
-- Step 3: Build barcode lookup endpoint (CNMC + legacy code lookup)
-- Step 4: Build material pre-fill on successful scan
-- Step 5: Build multi-item scan session before confirming GR
+- **0.1.1** Complete full-codebase audit _(refs: P1)_ — Backend, main frontend, a_p, shrindhi, schema, seeds reviewed.
+- **0.1.2** Write audit.md (65 findings, evidence level per finding)
+- **0.1.3** Rewrite plan.md and progress.md as a bug-by-bug fix plan _(refs: P1)_ — Old build plan remains in git history.
+- **0.1.4** Record working rules and product decisions in assistant memory
 
-### Part 2.4 — Goods Receipt Management
-- Step 1: Build GR creation endpoint (header + line items)
-- Step 2: Build GR list screen with filters
-- Step 3: Build GR detail screen with line item breakdown
-- Step 4: Build inventory update on GR confirmation
-- Step 5: Build price_history insert on GR confirmation
+### Part 0.2 — Decisions and housekeeping
+
+- **0.2.1** Decide data-access pattern: FastAPI for everything vs. direct Supabase for reads _(refs: Q5 · ❓ Decision)_ — Open. See Decisions Log D-1.
+- **0.2.2** Approve the order of the fix phases in this plan _(❓ Decision)_ — Approved by the user on 2026-09-19.
+- **0.2.3** Commit the existing uncommitted working tree locally (12 modified files + seed_demo_data.py) _(refs: Q4 · ❓ Decision)_ — Local commit 5cedcce; nothing pushed.
+
+### Part 0.3 — Live-database baseline (read-only, one approval per action)
+
+- **0.3.1** Check whether public sign-up is enabled in Supabase Auth _(refs: D2 · 🔒 DB)_
+- **0.3.2** List live RLS policies on profiles _(refs: D1 · 🔒 DB)_
+- **0.3.3** Check anon/authenticated grants on views and RPCs, and view security_invoker setting _(refs: D3 · 🔒 DB)_
+- **0.3.4** Check whether inventory is in the supabase_realtime publication _(refs: G5 · 🔒 DB)_
+- **0.3.5** Inspect vector index definition and test candidate recall _(refs: D4 · 🔒 DB)_
+- **0.3.6** Capture per-table row counts as the baseline for the dataset work _(🔒 DB)_
 
 ---
 
-## PHASE 3 — AI Core
-*Days 4–5 | The intelligence layer*
+## Phase 1 — Database Security & Schema Fixes
 
-### Part 3.1 — Embedding Service
-- Step 1: Integrate Gemini text-embedding-004 in FastAPI
-- Step 2: Build embedding generation for incoming material descriptions
-- Step 3: Build pgvector cosine similarity search
-- Step 4: Set similarity thresholds (exact / near-dup / new)
+*Close the privilege-escalation and RLS holes and add the database functions later phases depend on. All SQL is written as reviewable migration files first; nothing is applied without approval, one statement group at a time.*
 
-### Part 3.2 — Material Matching Engine
-- Step 1: Build matching_service with pgvector top-5 candidate retrieval
-- Step 2: Build Gemini scoring prompt for each candidate pair
-- Step 3: Build matching_queue insert logic per result
-- Step 4: Wire matching as a FastAPI BackgroundTask on every new material intake
-- Step 5: Build auto-resolution for high-confidence exact matches
+### Part 1.1 — Access control
 
-### Part 3.3 — CNMC Generator
-- Step 1: Build CNMC generation prompt with category tree
-- Step 2: Build CNMC parser and validator (format check)
-- Step 3: Build uniqueness check against existing CNMCs
-- Step 4: Build collision handler (append suffix if CNMC already exists)
-- Step 5: Wire CNMC generation into new material intake flow
+- **1.1.1** Restrict profiles self-update so role and is_active cannot be changed by the user _(refs: D1 · 🔒 DB)_
+- **1.1.2** Remove or constrain profiles_insert_self _(refs: D1 · 🔒 DB)_
+- **1.1.3** Make handle_new_user ignore metadata role; default to least privilege _(refs: D2 · 🔒 DB)_
+- **1.1.4** Make views security_invoker (or grant explicitly) so RLS applies _(refs: D3 · 🔒 DB)_
+- **1.1.5** Revoke blanket anon grants on tables, views and routines; grant only what is needed _(refs: D3 · 🔒 DB)_
+- **1.1.6** Add SET search_path to all SECURITY DEFINER functions _(refs: D3 · 🔒 DB)_
 
-### Part 3.4 — Approval Workflow
-- Step 1: Build pending approvals list endpoint
-- Step 2: Build approve-mapping endpoint (merge quantities, deprecate duplicate)
-- Step 3: Build reject-mapping endpoint (proceed as new material)
-- Step 4: Build Pending Approvals screen (Entry dashboard)
-- Step 5: Build approval confirmation with audit log write
+### Part 1.2 — Migrations and schema alignment
+
+- **1.2.1** Create a migrations/ folder; remove the duplicate schema.sql copy; document how to apply _(refs: D5 · 🗑 Delete)_ — Deleting one of the two identical copies needs approval.
+- **1.2.2** Confirm_receipt RPC: one transaction creating GR, lines, new materials, inventory upsert, price_history and audit rows _(refs: E2, E3, E5, E6, A7 · 🔒 DB)_
+- **1.2.3** approve_mapping RPC: merge stock, repoint references, deprecate duplicate, audit _(refs: E12 · 🔒 DB)_
+- **1.2.4** Read-only NL-query executor (restricted role or RPC with statement timeout, allow-listed views) _(refs: G1 · 🔒 DB)_
+- **1.2.5** Aggregate RPCs/views for Accounts: price comparison, savings opportunities, valuation (latest price), aging, vendor scorecard, purchase history _(refs: C1, C3, B8 · 🔒 DB)_
+- **1.2.6** Admin RPCs: dashboard stats, matching-queue stats, system-health metrics _(refs: M5, M6, B8 · 🔒 DB)_
+- **1.2.7** Add inventory to the realtime publication (if the map keeps its Live claim) _(refs: G5 · 🔒 DB ❓ Decision)_
+- **1.2.8** Rebuild vector index for the real data size (HNSW or ivfflat with suitable lists/probes) _(refs: D4 · 🔒 DB)_
 
 ---
 
-## PHASE 4 — Engineering Dashboard
-*Day 6 | Find materials, query inventory*
+## Phase 2 — Backend Foundation
 
-### Part 4.1 — NL→SQL Service
-- Step 1: Build NL→SQL Gemini prompt with schema context
-- Step 2: Build SQL safety validator (SELECT only, no mutations)
-- Step 3: Build safe query executor against Supabase
-- Step 4: Build nl_query_log insert on every query
-- Step 5: Build error handling for invalid SQL
+*Correct, secure, observable API layer.*
 
-### Part 4.2 — NL Query UI
-- Step 1: Build NL query search bar with example placeholders
-- Step 2: Build loading and streaming state
-- Step 3: Build results table with material + location columns
-- Step 4: Build SQL reveal (collapsible) with explanation
-- Step 5: Build query history panel
+### Part 2.1 — Auth and access control
 
-### Part 4.3 — Material Catalog & Detail
-- Step 1: Build material catalog with category filter tree
-- Step 2: Build material search (description + CNMC)
-- Step 3: Build material detail page (specs, inventory, price history)
-- Step 4: Build related/equivalent materials section
+- **2.1.1** Shared Supabase client and cached token verification (remove per-request client creation) _(refs: B5)_
+- **2.1.2** Reject users with no profile or is_active = false; remove role defaults _(refs: B4)_
+- **2.1.3** Real logout that revokes the user's session _(refs: B3)_
+- **2.1.4** Return generic auth errors; log details server-side _(refs: B6)_
+- **2.1.5** Enforce role checks on every endpoint (including /intake/confirm and /intake/barcode) _(refs: B1)_
+- **2.1.6** Decide and implement the approval-authority matrix (who may approve materials / mappings) _(refs: B10 · ❓ Decision)_
+- **2.1.7** Replace .single() with maybe_single() and proper 404 handling _(refs: B2)_
 
-### Part 4.4 — Inventory Map
-- Step 1: Build warehouse grid layout component
-- Step 2: Build bin color coding (stock level status)
-- Step 3: Build bin click → show stored materials
-- Step 4: Connect to live inventory data
+### Part 2.2 — Reliability and hygiene
+
+- **2.2.1** Structured logging and a global exception handler with request IDs (replace print) _(refs: B7, A7)_
+- **2.2.2** Dashboard stats: UTC-correct 'today', surface errors instead of returning 0 _(refs: B7)_
+- **2.2.3** Run blocking SDK calls (Gemini, Supabase) off the event loop _(refs: A3)_
+- **2.2.4** Config cleanup: drop unused JWT_SECRET / python-jose; add google-genai; pin and document deps _(refs: B9, A5)_
+- **2.2.5** Remove dead code (mismatched models, unused prompts, broken match_materials_rpc.sql) _(refs: B9 · 🗑 Delete)_ — File deletions need approval.
+- **2.2.6** Bounds and pagination limits on all list endpoints _(refs: B8)_
+- **2.2.7** pytest scaffold with mocked Supabase and Gemini; first tests for auth and role checks _(refs: Q3)_
 
 ---
 
-## PHASE 5 — Accounts Dashboard
-*Day 7 | Price intelligence and financial visibility*
+## Phase 3 — Intake Pipeline (OCR, Barcode, Confirm, Matching)
 
-### Part 5.1 — Price Comparison Engine
-- Step 1: Build price history aggregation endpoint per material per vendor
-- Step 2: Build vendor ranking logic (avg price + quality score)
-- Step 3: Build savings calculator (best vendor vs current vendor delta)
-- Step 4: Build bulk savings opportunities endpoint
+*A scanned bill can be reviewed and confirmed end to end, and confirming really updates stock, prices, matches and the audit trail.*
 
-### Part 5.2 — Price Intelligence UI
-- Step 1: Build material selector with search
-- Step 2: Build vendor comparison table with recommendation badge
-- Step 3: Build price trend chart (Recharts line chart, per vendor)
-- Step 4: Build savings calculator display
-- Step 5: Build "Switch vendor, save ₹X" alert cards
+### Part 3.1 — OCR service
 
-### Part 5.3 — Stock Valuation & Vendor Analysis
-- Step 1: Build total inventory value by category endpoint
-- Step 2: Build aging inventory endpoint (90/180/365 days no movement)
-- Step 3: Build stock valuation screen (pie chart + table)
-- Step 4: Build vendor scorecard endpoint (price + quality + volume)
-- Step 5: Build vendor analysis screen
+- **3.1.1** Robust JSON extraction (fence-tolerant, request JSON mime type) _(refs: A1 · 🌐 Quota)_
+- **3.1.2** Distinguish 'unreadable bill' from quota/network errors in the API response _(refs: A1)_
+- **3.1.3** Validate and coerce OCR fields (null/strings/units) before use _(refs: A2)_
+- **3.1.4** Make OCR a read-only draft: no materials, queue rows or audit rows before confirm _(refs: E4, E5, A7 · ❓ Decision)_ — Design change proposed in Decisions Log D-6.
+- **3.1.5** Signed URLs for the private bill-images bucket; correct file extension per type _(refs: A8)_
+- **3.1.6** Upload type/size validation with clear errors _(refs: E14, A8)_
 
----
+### Part 3.2 — Matching and CNMC
 
-## PHASE 6 — Admin Dashboard
-*Day 8 | Governance, audit, full control*
+- **3.2.1** Batch embeddings and parallelise per-line work; run post-confirm matching as a BackgroundTask _(refs: A3 · 🌐 Quota)_
+- **3.2.2** Use configured similarity thresholds; implement auto-resolve for high-confidence exact matches _(refs: A4)_
+- **3.2.3** Align stored and runtime embedding text and task type; re-embed materials _(refs: A5 · 🔒 DB 🌐 Quota)_ — Re-embedding writes to the database and uses Gemini quota.
+- **3.2.4** Centralise model names in config (no floating alias in code) _(refs: A6)_
+- **3.2.5** Guard CNMC generation with a deterministic fallback; uniqueness enforced at confirm time _(refs: A2, E5)_
+- **3.2.6** Match new lines of the same bill against each other _(refs: E5)_
 
-### Part 6.1 — Material Governance
-- Step 1: Build material list with all statuses (pending/approved/deprecated)
-- Step 2: Build single material approve/deprecate endpoints
-- Step 3: Build bulk approve endpoint
-- Step 4: Build material edit endpoint (description, specs, CNMC) with audit
-- Step 5: Build material merge endpoint (deprecate + transfer inventory)
-- Step 6: Build governance screen UI
+### Part 3.3 — Confirm and receipts API
 
-### Part 6.2 — Audit Trail
-- Step 1: Build audit log query endpoint (paginated, filterable)
-- Step 2: Build audit trail screen with filters (actor, action, entity, date)
-- Step 3: Build entity-level audit view (history for one material/GR)
+- **3.3.1** POST /intake/confirm calls the transactional RPC; returns GR number and totals _(refs: E2, E3, E6)_
+- **3.3.2** Server-side validation: date default, quantity > 0, location exists, quality in A/B/C _(refs: E1, E3)_
+- **3.3.3** Idempotency key to prevent double-submit creating two receipts _(refs: E3)_
+- **3.3.4** GET /intake/receipts with vendor/status/date filters, gr_number, vendor name, total _(refs: E9, E10)_
+- **3.3.5** GET /intake/receipts/{id} with line items and material details _(refs: E8)_
+- **3.3.6** Approve/reject mapping endpoints use the RPC, require status = pending, write audit _(refs: E12)_
 
-### Part 6.3 — Duplicate Detection Overview
-- Step 1: Build matching queue stats endpoint
-- Step 2: Build duplicate families grouping query
-- Step 3: Build duplicate detection screen with bulk review
+### Part 3.4 — Intake UI
 
-### Part 6.4 — User Management & System Health
-- Step 1: Build user list + create user endpoints
-- Step 2: Build user management screen
-- Step 3: Build system health stats endpoint (API usage, DB size, error count)
-- Step 4: Build system health screen
+- **3.4.1** Default receipt date to today; validate before submit with inline errors _(refs: E1)_
+- **3.4.2** Show real backend error messages in toasts _(refs: E1)_
+- **3.4.3** After confirm: show GR number and navigate to the receipt detail _(refs: E1, E10)_
+- **3.4.4** Recompute line totals on edit; guard NaN; require quantity > 0 _(refs: E7)_
+- **3.4.5** Send edited description/CNMC in the confirm payload and honour it server-side _(refs: E6)_
+- **3.4.6** Cancel without page reload; clear file state; discard the draft cleanly _(refs: E4, E14)_
+- **3.4.7** Receipt History: working filters, correct status values, detail panel with its own state _(refs: E8, E9, E10)_
+- **3.4.8** Home page: open the clicked receipt via ?id; fix status colour map _(refs: E9, E11)_
+- **3.4.9** Pending Approvals: error toasts and result summary after approve/reject _(refs: E12)_
+- **3.4.10** Barcode tab: location dropdown, shared vendor/date header, stable onDecode, real new-material path _(refs: E13)_
+- **3.4.11** Separate OCR and barcode draft state _(refs: E14)_
+- **3.4.12** Locations page: implement a real read-only list, or hide the menu item _(refs: E15 · ❓ Decision)_
 
 ---
 
-## PHASE 7 — Landing Page & Polish
-*Day 9 | First impressions and production readiness*
+## Phase 4 — Natural-Language Query (real Gemini)
 
-### Part 7.1 — Landing Page
-- Step 1: Build hero section with CNMC animation
-- Step 2: Build live stats section (pulls from admin dashboard endpoint)
-- Step 3: Build capabilities section (6 feature cards)
-- Step 4: Build problem statement section with impact numbers
+*Engineer questions are answered by a real model-generated, validated, read-only SQL query, within free-tier limits.*
 
-### Part 7.2 — Polish & Edge Cases
-- Step 1: Add loading skeletons to all data-fetching screens
-- Step 2: Add empty states to all list screens
-- Step 3: Add error boundaries and toast notifications
-- Step 4: Mobile responsive pass on all dashboards
-- Step 5: Sidebar collapse on small screens
+### Part 4.1 — NL→SQL service
 
-### Part 7.3 — Demo Preparation
-- Step 1: Create 3 realistic BharatOil bill images for OCR demo
-- Step 2: Pre-seed matching queue with pending duplicates for demo
-- Step 3: Rehearse full 3-minute demo narrative end to end
-- Step 4: Prepare demo user accounts (one per role, easy passwords)
+- **4.1.1** LLM provider abstraction: Gemini by default; Ollama (Mistral or DeepSeek) as demo fallback _(refs: G1 · ❓ Decision)_ — Deployed-demo hosting of Ollama is an open question (D-5).
+- **4.1.2** Schema-aware prompt limited to approved views with column descriptions and examples _(refs: G1 · 🌐 Quota)_
+- **4.1.3** SQL safety validator: single SELECT, allow-listed views, forced LIMIT, no functions/comments _(refs: G1)_
+- **4.1.4** Executor uses the read-only role/RPC with a statement timeout _(refs: G1)_
+- **4.1.5** Free-tier protection: per-user rate limit, result cache, daily request budget, graceful fallback _(refs: G1 · 🌐 Quota)_
+- **4.1.6** Log every query with provider, latency, success/error into nl_query_log _(refs: G4, G1 · 🔒 DB)_ — Writes rows at runtime via the app.
+- **4.1.7** User-friendly error and no-result handling _(refs: G1)_
+
+### Part 4.2 — NL query UI
+
+- **4.2.1** Fix API base URL usage (single API client, no optional-chained import.meta.env) _(refs: G2)_
+- **4.2.2** Show real phases and the provider that answered; remove the fake 'Generating SQL with Gemini' text _(refs: G1)_
+- **4.2.3** Persistent query history loaded from nl_query_log; remove the client-side insert _(refs: G4)_
 
 ---
 
-## PHASE 8 — Deployment
-*Day 10 | Ship it*
+## Phase 5 — Engineer Dashboard
 
-### Part 8.1 — Deploy Frontend
-- Step 1: Push React app to GitHub
-- Step 2: Connect GitHub repo to Vercel
-- Step 3: Set VITE_ environment variables in Vercel dashboard
-- Step 4: Deploy and verify all routes work
+*Every engineer screen shows correct, live database content.*
 
-### Part 8.2 — Deploy Backend
-- Step 1: Push FastAPI app to GitHub
-- Step 2: Connect repo to Render, set as Python web service
-- Step 3: Set environment variables in Render dashboard
-- Step 4: Deploy and verify health endpoint + all API routes
+### Part 5.1 — Home, map, catalog, detail
 
-### Part 8.3 — Final Checks
-- Step 1: Test full OCR intake flow on deployed URLs
-- Step 2: Test barcode scanning on deployed frontend
-- Step 3: Test NL→SQL on deployed stack end to end
-- Step 4: Test all 4 role logins and dashboard access
-- Step 5: Verify audit trail capturing all actions
-- Step 6: Final demo run-through on production URLs
+- **5.1.1** Engineer Home: correct columns, low-stock from v_low_stock_alerts / reorder levels _(refs: G3)_
+- **5.1.2** Decide whether engineers may see pending materials (RLS) or the KPIs are relabelled _(refs: G7 · ❓ Decision)_
+- **5.1.3** Inventory map built from locations (empty bins shown) joined with inventory _(refs: G5)_
+- **5.1.4** Bin colours from each row's reorder_level and max_stock _(refs: G5)_
+- **5.1.5** Realtime updates working, or remove the 'Live' label _(refs: G5 · ❓ Decision)_
+- **5.1.6** Catalog category tree loaded from the database (matches CNMC tree, includes CIVIL) _(refs: G6)_
+- **5.1.7** Real debounce, page reset on search, safe escaping of search text _(refs: G6)_
+- **5.1.8** Material detail route: specs, inventory by bin, price history _(refs: G6)_ — May reuse the layout of shrindhi MaterialDetail (D-4).
+- **5.1.9** Equivalent materials via an access-safe RPC, both directions _(refs: G6, G7)_
 
 ---
 
-*8 Phases | 31 Parts | 130 Steps*
+## Phase 6 — Accounts Dashboard on Real Data
+
+*Price intelligence, valuation and vendor analysis computed from real receipts and price history.*
+
+### Part 6.1 — API
+
+- **6.1.1** Price comparison per material per vendor endpoint _(refs: C1, B8)_
+- **6.1.2** Vendor ranking and savings calculation _(refs: C1)_
+- **6.1.3** Savings opportunities endpoint _(refs: C1)_
+- **6.1.4** Stock valuation by category using the latest price _(refs: C1, C3)_
+- **6.1.5** Aging inventory endpoint (90/180/365 days) _(refs: C1)_
+- **6.1.6** Vendor scorecard endpoint (price, quality, volume) _(refs: C1)_
+- **6.1.7** Purchase history endpoint with filters and pagination _(refs: C1)_
+
+### Part 6.2 — UI
+
+- **6.2.1** Accounts Home from real endpoints _(refs: C1)_
+- **6.2.2** Price Intelligence from real endpoints _(refs: C1)_
+- **6.2.3** Stock Valuation from real endpoints (real locations) _(refs: C1, C2)_
+- **6.2.4** Vendor Analysis from real endpoints _(refs: C1)_
+- **6.2.5** Purchase History from real endpoints _(refs: C1)_
+- **6.2.6** Delete mockAccountsData.js and its utilities _(refs: C2 · 🗑 Delete)_
+- **6.2.7** Loading, empty and error states on all Accounts pages _(refs: C1)_
+
+---
+
+## Phase 7 — Admin Dashboard
+
+*Governance, audit, duplicates, users and health are real, audited and correct.*
+
+### Part 7.1 — Material governance
+
+- **7.1.1** Backend endpoints: approve, deprecate, bulk, edit, merge — each with audit, approved_by/at, deprecated_* fields _(refs: M4, B8)_
+- **7.1.2** Governance UI calls the backend; confirmation dialogs for bulk actions _(refs: M4)_
+- **7.1.3** Server-side pagination and safe search _(refs: M4)_
+
+### Part 7.2 — Audit trail
+
+- **7.2.1** Audit query endpoint (paginated; filters: actor, action, entity, date range) _(refs: M2, M7, B8)_
+- **7.2.2** Audit UI: correct columns, action/entity values from the data, date filter, actor names, escaped CSV _(refs: M2, M7)_
+
+### Part 7.3 — Duplicate detection
+
+- **7.3.1** Matching stats endpoint and queue listing with correct columns/statuses _(refs: M1, B8)_
+- **7.3.2** Merge / reject actions via the approve_mapping RPC with audit _(refs: M1)_
+- **7.3.3** Duplicate detection UI rewired to the new endpoints _(refs: M1)_
+
+### Part 7.4 — Users and system health
+
+- **7.4.1** Admin-only create-user endpoint (auth user + profile) and role change with audit _(refs: M3, B8)_
+- **7.4.2** User list with correct columns; prevent self-deactivation; enforce is_active _(refs: M3, B4)_
+- **7.4.3** System health: real DB, Gemini/Ollama status, recent errors, table sizes _(refs: M6)_
+- **7.4.4** Admin Home KPIs computed correctly (duplicates, data quality) _(refs: M5)_
+
+---
+
+## Phase 8 — One Consistent Dataset
+
+*A single coherent demo dataset in the real database, replacing random seeds.*
+
+### Part 8.1 — Design and script
+
+- **8.1.1** Write the dataset specification for review (vendors, locations, materials, receipts, price history, matches, audit) _(❓ Decision)_
+- **8.1.2** Idempotent seed script where inventory, price_history and audit rows are derived from the receipts
+- **8.1.3** Dry-run mode that prints what would change without contacting the database
+- **8.1.4** Remove the random seed_demo_data.py after replacement _(🗑 Delete)_
+- **8.1.5** Demo bill images generated from the dataset's own materials and vendors
+
+### Part 8.2 — Apply to the database (one approval per action)
+
+- **8.2.1** Plan cleanup of existing random demo rows (list exactly what will be removed) _(🔒 DB 🗑 Delete)_
+- **8.2.2** Apply cleanup _(🔒 DB 🗑 Delete)_
+- **8.2.3** Apply dataset _(🔒 DB)_
+- **8.2.4** Generate embeddings for the dataset (quota-aware) _(refs: A5 · 🔒 DB 🌐 Quota)_
+- **8.2.5** Run consistency verification queries (inventory = receipts, prices = lines, etc.) _(🔒 DB)_
+- **8.2.6** Reset demo account passwords _(refs: S3 · 🔒 DB)_
+
+---
+
+## Phase 9 — Frontend Structure, Session & Quality
+
+*One coherent, testable, deployable frontend.*
+
+### Part 9.1 — Structure and session
+
+- **9.1.1** Move a_p/ pages into arya_frontend/src and fix imports (no cross-tree imports) _(refs: Q1)_
+- **9.1.2** shrindhi/: port anything still needed (MaterialDetail layout), then remove the app _(refs: Q2 · ❓ Decision 🗑 Delete)_ — Decision D-4; removal needs approval.
+- **9.1.3** Single API client with token refresh and 401 handling _(refs: S1)_
+- **9.1.4** Use Supabase session state (listener) instead of the mock_auth copy; document token-storage choice _(refs: S1, S2)_
+- **9.1.5** Login: real full name from profile; correct placeholder _(refs: S3)_
+- **9.1.6** Landing page: live stats from the database; remove unverifiable claims _(refs: L1)_
+
+### Part 9.2 — Quality
+
+- **9.2.1** ESLint config and a clean lint run _(refs: Q3)_
+- **9.2.2** Route-level code splitting _(refs: Q3)_
+- **9.2.3** Frontend tests (Vitest + Testing Library) for intake, auth and approvals _(refs: Q3)_
+- **9.2.4** README, env documentation, remove stray files and the empty root lockfile _(refs: Q5 · 🗑 Delete)_
+- **9.2.5** Consistent toast/error handling across pages _(refs: E1, M4)_
+
+---
+
+## Phase 10 — Verification & Deployment
+
+*Prove every audit finding is closed, then ship.*
+
+### Part 10.1 — Verification
+
+- **10.1.1** Regression pass: re-test every audit ID and record the result in progress.md
+- **10.1.2** End-to-end run for all 4 roles on real data
+- **10.1.3** Mobile-width pass on all dashboards
+- **10.1.4** Free-tier stress check of OCR + NL query flows _(🌐 Quota)_
+
+### Part 10.2 — Deployment (nothing is pushed without approval)
+
+- **10.2.1** Frontend deployment config and env vars _(refs: Q1 · ❓ Decision)_
+- **10.2.2** Backend deployment config and env vars; health endpoint _(❓ Decision)_
+- **10.2.3** Push to GitHub _(❓ Decision)_ — Only with explicit approval.
+- **10.2.4** Production smoke test and final demo rehearsal
+
+---
+
+## Audit coverage
+
+Every audit finding is mapped to at least one step:
+
+| Finding | Steps |
+|---|---|
+| E1 | 3.3.2, 3.4.1, 3.4.2, 3.4.3, 9.2.5 |
+| E2 | 1.2.2, 3.3.1 |
+| E3 | 1.2.2, 3.3.1, 3.3.2, 3.3.3 |
+| E4 | 3.1.4, 3.4.6 |
+| E5 | 1.2.2, 3.1.4, 3.2.5, 3.2.6 |
+| E6 | 1.2.2, 3.3.1, 3.4.5 |
+| E7 | 3.4.4 |
+| E8 | 3.3.5, 3.4.7 |
+| E9 | 3.3.4, 3.4.7, 3.4.8 |
+| E10 | 3.3.4, 3.4.3, 3.4.7 |
+| E11 | 3.4.8 |
+| E12 | 1.2.3, 3.3.6, 3.4.9 |
+| E13 | 3.4.10 |
+| E14 | 3.1.6, 3.4.6, 3.4.11 |
+| E15 | 3.4.12 |
+| B1 | 2.1.5 |
+| B2 | 2.1.7 |
+| B3 | 2.1.3 |
+| B4 | 2.1.2, 7.4.2 |
+| B5 | 2.1.1 |
+| B6 | 2.1.4 |
+| B7 | 2.2.1, 2.2.2 |
+| B8 | 1.2.5, 1.2.6, 2.2.6, 6.1.1, 7.1.1, 7.2.1, 7.3.1, 7.4.1 |
+| B9 | 2.2.4, 2.2.5 |
+| B10 | 2.1.6 |
+| A1 | 3.1.1, 3.1.2 |
+| A2 | 3.1.3, 3.2.5 |
+| A3 | 2.2.3, 3.2.1 |
+| A4 | 3.2.2 |
+| A5 | 2.2.4, 3.2.3, 8.2.4 |
+| A6 | 3.2.4 |
+| A7 | 1.2.2, 2.2.1, 3.1.4 |
+| A8 | 3.1.5, 3.1.6 |
+| G1 | 1.2.4, 4.1.1, 4.1.2, 4.1.3, 4.1.4, 4.1.5, 4.1.6, 4.1.7, 4.2.2 |
+| G2 | 4.2.1 |
+| G3 | 5.1.1 |
+| G4 | 4.1.6, 4.2.3 |
+| G5 | 0.3.4, 1.2.7, 5.1.3, 5.1.4, 5.1.5 |
+| G6 | 5.1.6, 5.1.7, 5.1.8, 5.1.9 |
+| G7 | 5.1.2, 5.1.9 |
+| C1 | 1.2.5, 6.1.1, 6.1.2, 6.1.3, 6.1.4, 6.1.5, 6.1.6, 6.1.7, 6.2.1, 6.2.2, 6.2.3, 6.2.4, 6.2.5, 6.2.7 |
+| C2 | 6.2.3, 6.2.6 |
+| C3 | 1.2.5, 6.1.4 |
+| M1 | 7.3.1, 7.3.2, 7.3.3 |
+| M2 | 7.2.1, 7.2.2 |
+| M3 | 7.4.1, 7.4.2 |
+| M4 | 7.1.1, 7.1.2, 7.1.3, 9.2.5 |
+| M5 | 1.2.6, 7.4.4 |
+| M6 | 1.2.6, 7.4.3 |
+| M7 | 7.2.1, 7.2.2 |
+| D1 | 0.3.2, 1.1.1, 1.1.2 |
+| D2 | 0.3.1, 1.1.3 |
+| D3 | 0.3.3, 1.1.4, 1.1.5, 1.1.6 |
+| D4 | 0.3.5, 1.2.8 |
+| D5 | 1.2.1 |
+| S1 | 9.1.3, 9.1.4 |
+| S2 | 9.1.4 |
+| S3 | 8.2.6, 9.1.5 |
+| Q1 | 9.1.1, 10.2.1 |
+| Q2 | 9.1.2 |
+| Q3 | 2.2.7, 9.2.1, 9.2.2, 9.2.3 |
+| Q4 | 0.2.3 |
+| Q5 | 0.2.1, 9.2.4 |
+| L1 | 9.1.6 |
+| P1 | 0.1.1, 0.1.3 |
+
+*11 phases · 146 steps · 65 audit findings*
