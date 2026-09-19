@@ -1,9 +1,16 @@
-﻿import re
+import logging
+import re
+from datetime import datetime, timezone
+from typing import Optional
+
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import Client
-from dependencies import get_supabase, get_current_user, CurrentUser
+from dependencies import get_supabase, get_current_user, require_roles, CurrentUser
 from services.audit_service import log_action
+from services.validators import require_uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,7 +37,7 @@ def _singularize(word: str) -> str:
 
 
 @router.post("/nl-query")
-async def nl_query(
+def nl_query(
     body: NLQueryRequest,
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(get_current_user),
@@ -99,20 +106,28 @@ async def nl_query(
         sql_display += ";"
         explanation = "Live inventory joined with material and location details, filtered by the terms in your question."
 
-    resp = query.execute()
-    results = resp.data or []
+    def _log(was_successful: bool, result_count: int, error: Optional[str] = None) -> None:
+        try:
+            supabase.table("nl_query_log").insert({
+                "user_id": current_user.id,
+                "natural_language_query": q,
+                "generated_sql": sql_display,
+                "sql_explanation": explanation,
+                "query_result_count": result_count,
+                "was_successful": was_successful,
+                "error_message": error,
+            }).execute()
+        except Exception:
+            logger.warning("Could not write nl_query_log entry", exc_info=True)
 
     try:
-        supabase.table("nl_query_log").insert({
-            "user_id": current_user.id,
-            "natural_language_query": q,
-            "generated_sql": sql_display,
-            "sql_explanation": explanation,
-            "query_result_count": len(results),
-            "was_successful": True,
-        }).execute()
-    except Exception:
-        pass
+        results = query.execute().data or []
+    except Exception as exc:
+        logger.exception("NL query failed: %r", q)
+        _log(False, 0, str(exc)[:500])
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="The query could not be run. Please try again.")
+
+    _log(True, len(results))
 
     return {
         "sql": sql_display,
@@ -122,13 +137,13 @@ async def nl_query(
     }
 
 @router.get("")
-async def list_materials(
-    status_filter: str = None,
-    category: str = None,
-    subcategory: str = None,
-    search: str = None,
-    limit: int = 50,
-    offset: int = 0,
+def list_materials(
+    status_filter: Optional[str] = None,
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -145,33 +160,32 @@ async def list_materials(
         q = q.eq("subcategory", subcategory)
     if search:
         q = q.ilike("standard_description", f"%{search}%")
-    resp = q.range(offset, offset + limit - 1).execute()
+    resp = q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
     return resp.data or []
 
 @router.get("/{material_id}")
-async def get_material(
+def get_material(
     material_id: str,
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    resp = supabase.table("materials").select("*").eq("id", material_id).single().execute()
-    if not resp.data:
+    resp = supabase.table("materials").select("*").eq("id", require_uuid(material_id, "Material")).maybe_single().execute()
+    if not resp or not resp.data:
         raise HTTPException(status_code=404, detail="Material not found")
     return resp.data
 
+# Who may approve materials is an open product decision (plan D-7); this keeps today's behaviour.
 @router.patch("/{material_id}/approve")
-async def approve_material(
+def approve_material(
     material_id: str,
     supabase: Client = Depends(get_supabase),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_roles("admin", "entry_operator", "engineer")),
 ):
-    if current_user.role not in ("admin","entry_operator","engineer"):
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
-    existing = supabase.table("materials").select("*").eq("id", material_id).single().execute()
-    if not existing.data:
+    material_id = require_uuid(material_id, "Material")
+    existing = supabase.table("materials").select("*").eq("id", material_id).maybe_single().execute()
+    if not existing or not existing.data:
         raise HTTPException(status_code=404, detail="Material not found")
     old_status = existing.data.get("status")
-    from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
     resp = supabase.table("materials").update({
         "status": "approved",

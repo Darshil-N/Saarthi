@@ -1,211 +1,258 @@
+import asyncio
+import logging
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from supabase import Client
 
-from dependencies import get_supabase, get_current_user, CurrentUser
-from models.intake import OCRResponse, LineItem, MatchStatus, ConfirmRequest, ConfirmResponse, BarcodeRequest
-from services.ocr_service import upload_bill_to_storage, run_ocr
-from services.matching_service import run_matching
-from services.cnmc_service import generate_cnmc
+from config import settings
+from dependencies import CurrentUser, get_current_user, get_supabase, require_roles
+from models.intake import (
+    BarcodeRequest,
+    ConfirmRequest,
+    ConfirmResponse,
+    LineItem,
+    MatchStatus,
+    OCRResponse,
+)
+from services import receipt_service
+from services.ai_common import AIServiceError
 from services.audit_service import log_action
+from services.cnmc_service import generate_cnmc
+from services.matching_service import run_matching
+from services.ocr_service import (
+    ALLOWED_BILL_TYPES,
+    OCRUnreadableError,
+    run_ocr,
+    signed_bill_url,
+    upload_bill_to_storage,
+)
+from services.validators import require_uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-async def _build_line_item(
-    supabase: Client,
-    raw: dict,
-    vendor_id: str | None,
-    user: CurrentUser,
-    line_idx: int,
-) -> LineItem:
-    desc = raw.get("description", "")
-    qty = float(raw.get("quantity", 0))
-    unit_price = float(raw.get("unit_price", 0))
-    total_price = round(qty * unit_price, 4)
+# Only entry operators (and admins, who may act on their behalf) can receive stock.
+_ENTRY_ROLES = ("entry_operator", "admin")
 
-    match_result = await run_matching(supabase, desc, incoming_specs=raw)
 
-    match_status_str = match_result.get("match_status", "new_material")
-    matched_id = match_result.get("matched_material_id")
-    is_new = match_status_str == "new_material"
-    cnmc = match_result.get("cnmc")
-    
-    # 1. Generate CNMC classification for the incoming material
-    if is_new:
-        cnmc_data = await generate_cnmc(supabase, desc, str(raw), raw.get("quality_grade", ""))
-    else:
-        mc = match_result.get("master_candidate", {})
-        cnmc_data = {
-            "cnmc": mc.get("cnmc"),
-            "category": mc.get("category", "MISC"),
-            "subcategory": mc.get("subcategory", "GEN"),
-            "type": mc.get("material_type"),
-            "spec": mc.get("spec"),
-            "quality": mc.get("quality_grade"),
-            "standard_description": mc.get("standard_description", desc),
-            "short_description": mc.get("short_description")
-        }
+# ------------------------------------------------------------------------------ helpers
 
-    cnmc = cnmc_data.get("cnmc")
-    quality_grade = cnmc_data.get("quality", "")
-    if quality_grade not in ("A", "B", "C"):
-        quality_grade = "A"
+async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
+    """Read an uploaded bill, enforcing the accepted types and the size limit."""
+    content_type = (file.content_type or "").lower()
+    if content_type == "image/jpg":
+        content_type = "image/jpeg"
+    if content_type not in ALLOWED_BILL_TYPES:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported file type. Upload a JPG, PNG, WebP image or a PDF.",
+        )
+    data = await file.read(settings.MAX_UPLOAD_BYTES + 1)
+    if not data:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The uploaded file is empty.")
+    if len(data) > settings.MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"The file is too large (limit {settings.MAX_UPLOAD_BYTES // (1024 * 1024)} MB).",
+        )
+    return data, content_type
 
-    # 2. Always create a pending material for the incoming item
-    new_mat = {
-        "cnmc": cnmc,
-        "category": cnmc_data.get("category", "MISC"),
-        "subcategory": cnmc_data.get("subcategory", "GEN"),
-        "material_type": cnmc_data.get("type"),
-        "spec": cnmc_data.get("spec"),
-        "quality_grade": quality_grade,
-        "standard_description": cnmc_data.get("standard_description", desc),
-        "short_description": cnmc_data.get("short_description"),
-        "status": "pending",
-        "embedding": match_result.get("embedding"),
-        "created_by": user.id,
-        "unit_of_measure": raw.get("unit", "EA"),
-    }
-    
-    new_material_id = None
+
+def _insert_pending_material(supabase: Client, material: dict) -> str | None:
+    """Insert a pending material, retrying with a numeric CNMC suffix on unique-key collisions."""
+    base_cnmc = material.get("cnmc")
     for attempt in range(5):
         try:
-            mat_resp = supabase.table("materials").insert(new_mat).execute()
-            if mat_resp.data:
-                new_material_id = mat_resp.data[0]["id"]
-                if is_new:
-                    log_action(supabase, user.id, user.role, "cnmc_generated", "materials", new_material_id, None, {"cnmc": new_mat["cnmc"]})
-            break
-        except Exception as e:
-            is_cnmc_conflict = new_mat.get("cnmc") and "materials_cnmc_key" in str(e)
-            if is_cnmc_conflict and attempt < 4:
-                new_mat["cnmc"] = f"{cnmc}-{attempt + 2}"
+            resp = supabase.table("materials").insert(material).execute()
+            return resp.data[0]["id"] if resp.data else None
+        except Exception as exc:
+            if base_cnmc and "materials_cnmc_key" in str(exc) and attempt < 4:
+                material["cnmc"] = f"{base_cnmc}-{attempt + 2}"
                 continue
-            print(f"Failed to insert pending material: {e}")
-            break
+            logger.exception("Could not insert pending material %r", material.get("standard_description"))
+            return None
+    return None
 
-    # 3. Insert into matching_queue
-    if new_material_id:
-        queue_row = {
-            "new_material_id": new_material_id,
-            "matched_material_id": matched_id,
-            "match_type": match_result.get("match_type", "different"),
-            "confidence_score": match_result.get("confidence", 0.0),
-            "vector_similarity": match_result.get("vector_similarity", 0.0),
-            "match_reason": match_result.get("match_reason", ""),
-            "status": "pending"
-        }
-        try:
-            supabase.table("matching_queue").insert(queue_row).execute()
-        except Exception as e:
-            print(f"Failed to insert matching_queue: {e}")
+
+async def _build_line_item(supabase: Client, raw: dict, vendor_id: str | None, user: CurrentUser) -> LineItem:
+    """Match one OCR line against the catalog and prepare its draft state.
+
+    Lines the AI is certain about (exact match, high confidence) link straight to the existing
+    material. Every other line gets a pending material (plus a review-queue entry when it resembles
+    an existing one) so stock can be booked against it and an approver can decide later.
+    """
+    description = raw["description"]
+    quantity = raw["quantity"]
+    unit_price = raw["unit_price"]
+
+    match = await run_matching(supabase, description, incoming_specs=raw)
+    matched_id = match["matched_material_id"]
+    candidate = match["master_candidate"]
 
     try:
-        ms = MatchStatus(match_status_str)
+        match_status = MatchStatus(match["match_status"])
     except ValueError:
-        ms = MatchStatus.uncertain
+        match_status = MatchStatus.uncertain
+
+    cnmc = match["cnmc"] if match["auto_link"] else None
+    pending_id: str | None = None
+
+    if not match["auto_link"]:
+        if candidate is None:
+            cnmc_data = await generate_cnmc(supabase, description, str(raw), raw.get("quality_grade") or "")
+            generated = True
+        else:
+            # A near-duplicate or uncertain line mirrors the catalog entry it resembles.
+            cnmc_data = {
+                "cnmc": candidate.get("cnmc"),
+                "category": candidate.get("category") or "MISC",
+                "subcategory": candidate.get("subcategory") or "GEN",
+                "type": candidate.get("material_type") or "GEN",
+                "spec": candidate.get("spec"),
+                "quality": candidate.get("quality_grade"),
+                "standard_description": candidate.get("standard_description") or description,
+                "short_description": candidate.get("short_description"),
+                "technical_specs": candidate.get("technical_specs"),
+            }
+            generated = False
+
+        pending_material = {
+            "cnmc": cnmc_data.get("cnmc"),
+            "category": cnmc_data.get("category") or "MISC",
+            "subcategory": cnmc_data.get("subcategory") or "GEN",
+            "material_type": cnmc_data.get("type") or "GEN",
+            "spec": cnmc_data.get("spec"),
+            "quality_grade": cnmc_data.get("quality") if cnmc_data.get("quality") in ("A", "B", "C") else "A",
+            "standard_description": cnmc_data.get("standard_description") or description,
+            "short_description": cnmc_data.get("short_description"),
+            "technical_specs": cnmc_data.get("technical_specs"),
+            "status": "pending",
+            "embedding": match["embedding"],
+            "created_by": user.id,
+            "unit_of_measure": raw["unit"],
+        }
+        pending_id = await asyncio.to_thread(_insert_pending_material, supabase, pending_material)
+        cnmc = pending_material.get("cnmc")
+
+        if pending_id and generated:
+            log_action(supabase, user.id, user.role, "cnmc_generated", "materials", pending_id, None, {"cnmc": cnmc})
+
+        # matching_queue.matched_material_id is NOT NULL, so only lines that resemble something are queued.
+        if pending_id and matched_id:
+            try:
+                supabase.table("matching_queue").insert({
+                    "new_material_id": pending_id,
+                    "matched_material_id": matched_id,
+                    "match_type": match["match_type"],
+                    "confidence_score": match["confidence"],
+                    "vector_similarity": match["vector_similarity"],
+                    "match_reason": match["match_reason"],
+                    "status": "pending",
+                }).execute()
+            except Exception:
+                logger.exception("Could not queue %s for review", pending_id)
 
     return LineItem(
-        line_id=raw.get("line_id", f"li_{line_idx:03d}"),
-        description=desc,
-        quantity=qty,
-        unit=raw.get("unit", "EA"),
+        line_id=raw["line_id"],
+        description=description,
+        quantity=quantity,
+        unit=raw["unit"],
         unit_price=unit_price,
-        total_price=total_price,
+        total_price=round(quantity * unit_price, 4),
         batch_number=raw.get("batch_number"),
         hsn_code=raw.get("hsn_code"),
-        match_status=ms,
+        match_status=match_status,
         matched_material_id=matched_id,
-        matched_description=match_result.get("matched_description"),
-        confidence=match_result.get("confidence", 0.0),
-        match_reason=match_result.get("match_reason"),
-        cnmc=new_mat.get("cnmc") or cnmc,
-        is_new_material=is_new,
-        quality_grade=quality_grade or raw.get("quality_grade", ""),
-        quality_notes=raw.get("quality_notes", ""),
-        location_code=raw.get("location_code"),
+        matched_description=match["matched_description"],
+        pending_material_id=pending_id,
+        confidence=match["confidence"],
+        match_reason=match["match_reason"],
+        cnmc=cnmc,
+        is_new_material=match_status == MatchStatus.new_material,
+        quality_grade=raw.get("quality_grade") or "A",
+        quality_notes="",
         vendor_id=vendor_id,
-        barcode=raw.get("barcode"),
-        expiry_date=raw.get("expiry_date"),
     )
+
+
+# ------------------------------------------------------------------------------ endpoints
 
 @router.post("/ocr", response_model=OCRResponse)
 async def intake_ocr(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    vendor_id: str = Form(None),
+    vendor_id: Optional[str] = Form(None),
     supabase: Client = Depends(get_supabase),
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_roles(*_ENTRY_ROLES)),
 ):
-    if current_user.role not in ("entry_operator", "admin"):
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
-
-    file_bytes = await file.read()
-    content_type = file.content_type or "image/jpeg"
+    file_bytes, content_type = await _read_upload(file)
 
     try:
-        bill_url = await upload_bill_to_storage(supabase, file_bytes, content_type)
-    except Exception as exc:
-        bill_url = None
-        print(f"[intake/ocr] Storage upload failed: {exc}")
+        raw_items = await run_ocr(file_bytes, content_type)
+    except OCRUnreadableError:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not find any line items on this bill. Try a clearer photo or a PDF.",
+        )
+    except AIServiceError as exc:
+        raise HTTPException(exc.status_code, detail=exc.user_message)
 
-    raw_items = await run_ocr(file_bytes, content_type)
-    if not raw_items:
-        raise HTTPException(status_code=422, detail="Could not extract line items")
+    bill_path = await upload_bill_to_storage(supabase, file_bytes, content_type)
 
-    line_items = []
-    for idx, raw in enumerate(raw_items):
-        li = await _build_line_item(supabase, raw, vendor_id, current_user, idx + 1)
-        line_items.append(li)
+    # Lines are processed one at a time on purpose: it keeps bursts of Gemini calls within
+    # the free-tier rate limit.
+    line_items = [await _build_line_item(supabase, raw, vendor_id, current_user) for raw in raw_items]
 
-    draft_id = f"draft-{uuid.uuid4()}"
-    return OCRResponse(receipt_id=draft_id, line_items=line_items, bill_image_url=bill_url or None)
+    return OCRResponse(
+        receipt_id=f"draft-{uuid.uuid4()}",
+        line_items=line_items,
+        bill_image_url=await asyncio.to_thread(signed_bill_url, supabase, bill_path),
+        bill_image_path=bill_path,
+    )
+
 
 @router.post("/barcode")
-async def intake_barcode(body: BarcodeRequest, supabase: Client = Depends(get_supabase), current_user: CurrentUser = Depends(get_current_user)):
+def intake_barcode(
+    body: BarcodeRequest,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(require_roles(*_ENTRY_ROLES)),
+):
     code = body.code.strip()
+    if not code:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The barcode is empty.")
 
     material_id = None
-    # 1. Check legacy code mappings first (CNMC + legacy code lookup)
-    mapping_resp = (
-        supabase.table("material_code_mappings")
-        .select("material_id")
-        .eq("legacy_code", code)
-        .limit(1)
-        .execute()
+    # 1. Legacy code mappings first (CNMC + legacy code lookup)
+    mapping = (
+        supabase.table("material_code_mappings").select("material_id").eq("legacy_code", code).limit(1).execute()
     )
-    if mapping_resp.data:
-        material_id = mapping_resp.data[0]["material_id"]
+    if mapping.data:
+        material_id = mapping.data[0]["material_id"]
 
-    # 2. Fall back to direct CNMC match
+    # 2. Fall back to a direct CNMC match
     if not material_id:
-        cnmc_resp = (
-            supabase.table("materials")
-            .select("id")
-            .eq("cnmc", code)
-            .limit(1)
-            .execute()
-        )
-        if cnmc_resp.data:
-            material_id = cnmc_resp.data[0]["id"]
+        by_cnmc = supabase.table("materials").select("id").eq("cnmc", code).limit(1).execute()
+        if by_cnmc.data:
+            material_id = by_cnmc.data[0]["id"]
 
     if not material_id:
         return {"found": False, "barcode": code}
 
-    mat_resp = (
+    mat = (
         supabase.table("materials")
         .select("id, cnmc, standard_description, unit_of_measure, quality_grade")
         .eq("id", material_id)
-        .single()
+        .maybe_single()
         .execute()
     )
-    if not mat_resp.data:
+    if not mat or not mat.data:
         return {"found": False, "barcode": code}
+    material = mat.data
 
-    material = mat_resp.data
-
-    # Last known price from price_history
-    price_resp = (
+    price = (
         supabase.table("price_history")
         .select("unit_price")
         .eq("material_id", material_id)
@@ -213,7 +260,7 @@ async def intake_barcode(body: BarcodeRequest, supabase: Client = Depends(get_su
         .limit(1)
         .execute()
     )
-    last_price = price_resp.data[0]["unit_price"] if price_resp.data else 0.0
+    last_price = price.data[0]["unit_price"] if price.data else 0.0
 
     return {
         "found": True,
@@ -221,78 +268,71 @@ async def intake_barcode(body: BarcodeRequest, supabase: Client = Depends(get_su
         "matched_material_id": material["id"],
         "cnmc": material["cnmc"],
         "description": material["standard_description"],
-        "unit": material.get("unit_of_measure", "EA"),
+        "unit": material.get("unit_of_measure") or "EA",
         "unit_price": last_price,
-        "quality_grade": material.get("quality_grade", ""),
+        "quality_grade": material.get("quality_grade") or "",
         "match_status": "exact_match",
         "is_new_material": False,
         "confidence": 1.0,
     }
 
-@router.get("/receipts")
-async def get_receipts(limit: int = 10, supabase: Client = Depends(get_supabase), current_user: CurrentUser = Depends(get_current_user)):
-    resp = supabase.table("goods_receipts").select("*, vendors(name), gr_line_items(id)").order("created_at", desc=True).limit(limit).execute()
-    receipts = []
-    for row in (resp.data or []):
-        vendor = row.get("vendors") or {}
-        receipts.append({
-            "id": row["id"],
-            "vendor_id": row["vendor_id"],
-            "vendor_name": vendor.get("name") or "Unknown Vendor",
-            "receipt_date": row["receipt_date"],
-            "status": row["status"],
-            "items_count": len(row.get("gr_line_items", [])),
-        })
-    return receipts
 
+def _optional_filter(value: Optional[str]) -> Optional[str]:
+    """The UI sends 'all' or an empty string for 'no filter'."""
+    value = (value or "").strip()
+    return None if value in ("", "all") else value
+
+
+def _optional_date(value: Optional[str], name: str) -> Optional[date]:
+    value = _optional_filter(value)
+    if value is None:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"{name} must be a date like 2026-09-19")
+
+
+@router.get("/receipts")
+def get_receipts(
+    vendor_id: Optional[str] = None,
+    status_filter: Optional[str] = Query(None, alias="status"),
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    vendor = _optional_filter(vendor_id)
+    return receipt_service.list_receipts(
+        supabase,
+        vendor_id=require_uuid(vendor, "Vendor") if vendor else None,
+        receipt_status=_optional_filter(status_filter),
+        from_date=_optional_date(from_date, "from_date"),
+        to_date=_optional_date(to_date, "to_date"),
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/receipts/{receipt_id}")
+def get_receipt(
+    receipt_id: str,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    detail = receipt_service.get_receipt_detail(supabase, require_uuid(receipt_id, "Receipt"))
+    if detail is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+    return detail
 
 
 @router.post("/confirm", response_model=ConfirmResponse)
-async def confirm_receipt(body: ConfirmRequest, supabase: Client = Depends(get_supabase), current_user: CurrentUser = Depends(get_current_user)):
-    # 1. Create Goods Receipt
-    gr_payload = {
-        "vendor_id": body.vendor_id,
-        "receipt_date": body.receipt_date.isoformat(),
-        "po_number": body.po_number,
-        "bill_image_url": body.bill_image_url,
-        "received_by": current_user.id,
-        "status": "completed"
-    }
-    gr_resp = supabase.table("goods_receipts").insert(gr_payload).execute()
-    if not gr_resp.data:
-        raise HTTPException(status_code=500, detail="Failed to create goods receipt")
-    
-    gr_id = gr_resp.data[0]["id"]
-    
-    # 2. Insert Line Items
-    items_to_insert = []
-    for item in body.line_items:
-        items_to_insert.append({
-            "gr_id": gr_id,
-            "material_id": item.matched_material_id,
-            "quantity_received": item.quantity,
-            "unit_of_measure": item.unit,
-            "unit_price": item.unit_price,
-            "quality_grade": item.quality_grade,
-            "quality_notes": item.quality_notes,
-            "location_code": item.location_code,
-            "barcode": item.barcode,
-            "batch_number": item.batch_number,
-            "expiry_date": item.expiry_date.isoformat() if item.expiry_date else None,
-            "raw_description": item.description,
-            "match_status": item.match_status.value
-        })
-    
-    if items_to_insert:
-        li_resp = supabase.table("gr_line_items").insert(items_to_insert).execute()
-        if not li_resp.data:
-            print("Warning: failed to insert gr_line_items")
-            
-    # Also log the action
-    log_action(supabase, current_user.id, current_user.role, "receipt_confirmed", "goods_receipts", gr_id, None, None)
-
-    return ConfirmResponse(
-        receipt_id=gr_id,
-        status="success",
-        line_items_created=len(items_to_insert)
-    )
+def confirm_receipt(
+    body: ConfirmRequest,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(require_roles(*_ENTRY_ROLES)),
+):
+    result = receipt_service.confirm_receipt(supabase, current_user, body)
+    return ConfirmResponse(status="success", **result)

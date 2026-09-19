@@ -1,5 +1,9 @@
-﻿from supabase import Client
+import logging
 from typing import Any
+
+from supabase import Client
+
+logger = logging.getLogger(__name__)
 
 
 def log_action(
@@ -13,7 +17,7 @@ def log_action(
     new_value: Any = None,
 ) -> None:
     """
-    Write one row to audit_log. Fire-and-forget; errors are swallowed
+    Write one row to audit_log. Fire-and-forget; errors are logged and swallowed
     so that a logging failure never aborts a business operation.
     """
     try:
@@ -26,5 +30,5 @@ def log_action(
             "old_value": old_value,
             "new_value": new_value,
         }).execute()
-    except Exception as exc:
-        print(f"[audit_service] WARNING: failed to write audit log – {exc}")
+    except Exception:
+        logger.warning("Failed to write audit log entry %s for %s %s", action, entity_type, entity_id, exc_info=True)

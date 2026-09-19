@@ -1,52 +1,57 @@
-﻿from fastapi import APIRouter, Depends
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
-from datetime import date
-from dependencies import get_supabase, get_current_user, CurrentUser
+
+from dependencies import CurrentUser, get_current_user, get_supabase
+from services.time_utils import business_day_start_utc
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
+def _count(query) -> int:
+    return query.execute().count or 0
+
+
 @router.get("/entry")
-async def entry_dashboard_stats(
+def entry_dashboard_stats(
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """
-    Returns summary stats for the Entry Operator home dashboard:
-    - todayReceipts: number of goods_receipts created today
-    - pendingApprovals: number of matching_queue rows with status=pending
-    - newMaterialsToday: materials with status=pending created today
-    - duplicatesDetected: matching_queue rows with match_type in (exact, duplicate) today
+    Summary stats for the Entry Operator home dashboard ("today" is the business day, not UTC):
+    - todayReceipts: goods_receipts created today
+    - pendingApprovals: matching_queue rows with status=pending
+    - newMaterialsToday: pending materials created today
+    - duplicatesDetected: matching_queue rows with match_type in (exact, duplicate) created today
     """
-    today = date.today().isoformat()
+    today_start = business_day_start_utc().isoformat()
 
     try:
-        gr_resp = supabase.table("goods_receipts").select("id", count="exact").gte("created_at", today).execute()
-        today_receipts = gr_resp.count or 0
+        return {
+            "todayReceipts": _count(
+                supabase.table("goods_receipts").select("id", count="exact").gte("created_at", today_start).limit(1)
+            ),
+            "pendingApprovals": _count(
+                supabase.table("matching_queue").select("id", count="exact").eq("status", "pending").limit(1)
+            ),
+            "newMaterialsToday": _count(
+                supabase.table("materials")
+                .select("id", count="exact")
+                .eq("status", "pending")
+                .gte("created_at", today_start)
+                .limit(1)
+            ),
+            "duplicatesDetected": _count(
+                supabase.table("matching_queue")
+                .select("id", count="exact")
+                .in_("match_type", ["exact", "duplicate"])
+                .gte("created_at", today_start)
+                .limit(1)
+            ),
+        }
     except Exception:
-        today_receipts = 0
-
-    try:
-        pending_resp = supabase.table("matching_queue").select("id", count="exact").eq("status", "pending").execute()
-        pending_approvals = pending_resp.count or 0
-    except Exception:
-        pending_approvals = 0
-
-    try:
-        new_mat_resp = supabase.table("materials").select("id", count="exact").eq("status", "pending").gte("created_at", today).execute()
-        new_materials_today = new_mat_resp.count or 0
-    except Exception:
-        new_materials_today = 0
-
-    try:
-        dup_resp = supabase.table("matching_queue").select("id", count="exact").in_("match_type", ["exact", "duplicate"]).gte("created_at", today).execute()
-        duplicates_detected = dup_resp.count or 0
-    except Exception:
-        duplicates_detected = 0
-
-    return {
-        "todayReceipts": today_receipts,
-        "pendingApprovals": pending_approvals,
-        "newMaterialsToday": new_materials_today,
-        "duplicatesDetected": duplicates_detected,
-    }
+        logger.exception("Could not load entry dashboard statistics")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Could not load dashboard statistics")
