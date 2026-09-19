@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useIntakeStore } from '../store/intakeStore';
 import { useToast } from '../hooks/use-toast';
 import api from '../lib/api';
+import { getApiErrorMessage } from '../lib/utils';
 
 export function useOCRUpload() {
   const { setReceiptId, setLineItems, setBillImageUrl } = useIntakeStore();
@@ -26,7 +27,7 @@ export function useOCRUpload() {
     onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to process receipt.",
+        description: getApiErrorMessage(error, "Failed to process receipt."),
         variant: "destructive",
       });
     }
@@ -58,10 +59,10 @@ export function useConfirmReceipt() {
         description: "Receipt has been submitted successfully.",
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to confirm receipt.",
+        description: getApiErrorMessage(error, "Failed to confirm receipt."),
         variant: "destructive",
       });
     }

@@ -147,8 +147,8 @@ This replaces the original build plan (still available in git history). Progress
 
 ### Part 3.4 — Intake UI
 
-- **3.4.1** Default receipt date to today; validate before submit with inline errors _(refs: E1)_
-- **3.4.2** Show real backend error messages in toasts _(refs: E1)_
+- **3.4.1** Default receipt date to today; validate before submit with inline errors _(refs: E1)_ — Code done: store defaults to local today; date required before OCR and before Confirm; inline error. Logic verified in Node + production build. Needs an in-browser check (requires live login, so awaiting your approval).
+- **3.4.2** Show real backend error messages in toasts _(refs: E1)_ — Code done: getApiErrorMessage() helper wired into OCR and confirm hooks; helper verified in Node against 422/string/500/network cases. Needs an in-browser check.
 - **3.4.3** After confirm: show GR number and navigate to the receipt detail _(refs: E1, E10)_
 - **3.4.4** Recompute line totals on edit; guard NaN; require quantity > 0 _(refs: E7)_
 - **3.4.5** Send edited description/CNMC in the confirm payload and honour it server-side _(refs: E6)_

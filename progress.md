@@ -1,6 +1,6 @@
 # Saarthi — Progress Tracker
 
-**Last updated:** 2026-09-19 — plan approved; pre-audit work committed locally (5cedcce); fixes not started
+**Last updated:** 2026-09-19 — Confirm-Receipt date/error fixes coded (3.4.1, 3.4.2), awaiting in-browser check
 **Overall:** 6 / 146 steps complete
 **Status:** 🟡 In progress — plan approved; decisions D-1, D-5, D-6, D-7, D-8 still open
 
@@ -19,7 +19,7 @@
 | 0 | Governance, Decisions & Live-DB Baseline | 6 / 13 | 🟡 In progress |
 | 1 | Database Security & Schema Fixes | 0 / 14 | ⚪ Not started |
 | 2 | Backend Foundation | 0 / 14 | ⚪ Not started |
-| 3 | Intake Pipeline (OCR, Barcode, Confirm, Matching) | 0 / 30 | ⚪ Not started |
+| 3 | Intake Pipeline (OCR, Barcode, Confirm, Matching) | 0 / 30 | 🟡 In progress |
 | 4 | Natural-Language Query (real Gemini) | 0 / 10 | ⚪ Not started |
 | 5 | Engineer Dashboard | 0 / 9 | ⚪ Not started |
 | 6 | Accounts Dashboard on Real Data | 0 / 14 | ⚪ Not started |
@@ -161,8 +161,8 @@
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 3.4.1 | Default receipt date to today; validate before submit with inline errors | [ ] | E1 |  |  |
-| 3.4.2 | Show real backend error messages in toasts | [ ] | E1 |  |  |
+| 3.4.1 | Default receipt date to today; validate before submit with inline errors | [~] | E1 |  | Code done: store defaults to local today; date required before OCR and before Confirm; inline error. Logic verified in Node + production build. Needs an in-browser check (requires live login, so awaiting your approval). |
+| 3.4.2 | Show real backend error messages in toasts | [~] | E1 |  | Code done: getApiErrorMessage() helper wired into OCR and confirm hooks; helper verified in Node against 422/string/500/network cases. Needs an in-browser check. |
 | 3.4.3 | After confirm: show GR number and navigate to the receipt detail | [ ] | E1, E10 |  |  |
 | 3.4.4 | Recompute line totals on edit; guard NaN; require quantity > 0 | [ ] | E7 |  |  |
 | 3.4.5 | Send edited description/CNMC in the confirm payload and honour it server-side | [ ] | E6 |  |  |
@@ -446,3 +446,4 @@ A finding is **Closed** only when every step that references it is `[x]` and the
 - `plan.md` and `progress.md` rewritten; the previous progress claim (116/130 done) was inaccurate and has been discarded.
 - No project code and no database was changed.
 - Plan order approved by the user. Pre-audit working tree committed locally as `5cedcce` (step 0.2.3); nothing pushed.
+- Steps 3.4.1 + 3.4.2 (audit E1): receipt date now defaults to today and is validated before OCR/Confirm with an inline error; intake toasts show the backend error text. Files: `intakeStore.js`, `useIntake.js`, `lib/utils.js`, `OCRUpload.jsx`. Verified: Node checks of store default/reset and error helper, production build. NOT yet verified in a browser (needs live login).

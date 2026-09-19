@@ -21,6 +21,8 @@ export default function OCRUpload() {
   const { setVendorId, setPoNumber, setReceiptDate } = useIntakeStore();
   
   const [file, setFile] = useState(null);
+  const [attempted, setAttempted] = useState(false);
+  const dateMissing = attempted && !receipt_date;
 
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles?.length > 0) {
@@ -38,8 +40,13 @@ export default function OCRUpload() {
   });
 
   const handleProcess = () => {
+    setAttempted(true);
     if (!vendor_id) {
       toast({ title: 'Vendor Required', description: 'Please select a vendor first.', variant: 'destructive' });
+      return;
+    }
+    if (!receipt_date) {
+      toast({ title: 'Receipt Date Required', description: 'Please enter the receipt date.', variant: 'destructive' });
       return;
     }
     if (!file) {
@@ -56,7 +63,13 @@ export default function OCRUpload() {
 
   const handleConfirm = () => {
     if (line_items.length === 0) return;
-    
+
+    setAttempted(true);
+    if (!receipt_date) {
+      toast({ title: 'Receipt Date Required', description: 'Please enter the receipt date.', variant: 'destructive' });
+      return;
+    }
+
     // Validate required fields
     const invalidRows = line_items.filter(i => !i.location_code || !i.quality_grade);
     if (invalidRows.length > 0) {
@@ -107,14 +120,16 @@ export default function OCRUpload() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="receiptDate">Receipt Date</Label>
+          <Label htmlFor="receiptDate">Receipt Date <span className="text-red-500">*</span></Label>
           <Input 
             id="receiptDate" 
             type="date"
             value={receipt_date}
             onChange={(e) => setReceiptDate(e.target.value)}
             disabled={!!receipt_id}
+            className={dateMissing ? 'border-red-400' : ''}
           />
+          {dateMissing && <p className="text-xs text-red-500">Receipt date is required.</p>}
         </div>
       </div>
 

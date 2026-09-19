@@ -1,16 +1,20 @@
 import { create } from 'zustand';
+import { format } from 'date-fns';
 
-const initialState = {
+// Local calendar date (not UTC) so the default matches the operator's "today".
+const todayISO = () => format(new Date(), 'yyyy-MM-dd');
+
+const getInitialState = () => ({
   receipt_id: null,
   vendor_id: null,
   po_number: '',
-  receipt_date: '',
+  receipt_date: todayISO(),
   bill_image_url: '',
   line_items: [],
-};
+});
 
 export const useIntakeStore = create((set) => ({
-  ...initialState,
+  ...getInitialState(),
   setReceiptId: (id) => set({ receipt_id: id }),
   setVendorId: (id) => set({ vendor_id: id }),
   setPoNumber: (po) => set({ po_number: po }),
@@ -26,5 +30,5 @@ export const useIntakeStore = create((set) => ({
   removeLineItem: (line_id) => set((state) => ({
     line_items: state.line_items.filter((item) => item.line_id !== line_id)
   })),
-  resetIntake: () => set(initialState),
+  resetIntake: () => set(getInitialState()),
 }));
