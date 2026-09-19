@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useToast } from './use-toast';
+import { getApiErrorMessage } from '../lib/utils';
 
 export function useMatchingQueue() {
   return useQuery({
@@ -13,6 +15,7 @@ export function useMatchingQueue() {
 
 export function useApproveMatch() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id) => {
@@ -27,10 +30,18 @@ export function useApproveMatch() {
       );
       return { previousMatches };
     },
+    onSuccess: () => {
+      toast({ title: 'Mapping approved' });
+    },
     onError: (err, variables, context) => {
       if (context?.previousMatches) {
         queryClient.setQueryData(['matching'], context.previousMatches);
       }
+      toast({
+        title: 'Could not approve the mapping',
+        description: getApiErrorMessage(err, 'Please try again.'),
+        variant: 'destructive',
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['matching'] });
@@ -40,6 +51,7 @@ export function useApproveMatch() {
 
 export function useRejectMatch() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id) => {
@@ -54,10 +66,18 @@ export function useRejectMatch() {
       );
       return { previousMatches };
     },
+    onSuccess: () => {
+      toast({ title: 'Mapping rejected' });
+    },
     onError: (err, variables, context) => {
       if (context?.previousMatches) {
         queryClient.setQueryData(['matching'], context.previousMatches);
       }
+      toast({
+        title: 'Could not reject the mapping',
+        description: getApiErrorMessage(err, 'Please try again.'),
+        variant: 'destructive',
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['matching'] });

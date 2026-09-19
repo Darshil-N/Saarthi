@@ -1,11 +1,12 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useIntakeStore } from '../store/intakeStore';
 import { useToast } from '../hooks/use-toast';
 import api from '../lib/api';
+import { cleanFilters } from '../lib/intake';
 import { getApiErrorMessage } from '../lib/utils';
 
 export function useOCRUpload() {
-  const { setReceiptId, setLineItems, setBillImageUrl } = useIntakeStore();
+  const { setReceiptId, setLineItems, setBillImageUrl, setBillImagePath } = useIntakeStore();
   const { toast } = useToast();
 
   return useMutation({
@@ -19,6 +20,7 @@ export function useOCRUpload() {
       setReceiptId(data.receipt_id);
       setLineItems(data.line_items || []);
       setBillImageUrl(data.bill_image_url || '');
+      setBillImagePath(data.bill_image_path || null);
       toast({
         title: "Success",
         description: "Receipt processed successfully.",
@@ -46,17 +48,24 @@ export function useBarcodeIntake() {
 export function useConfirmReceipt() {
   const { resetIntake } = useIntakeStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (confirmData) => {
       const { data } = await api.post('/intake/confirm', confirmData);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       resetIntake();
+      // Home stats, receipt lists and pending approvals all changed.
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['entry-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['matching'] });
       toast({
-        title: "Receipt Confirmed",
-        description: "Receipt has been submitted successfully.",
+        title: data.already_confirmed ? "Receipt Already Confirmed" : "Receipt Confirmed",
+        description: data.already_confirmed
+          ? `${data.gr_number} was already saved earlier. Nothing was duplicated.`
+          : `${data.gr_number} saved with ${data.line_items_created} item(s). Stock and price history are updated.`,
       });
     },
     onError: (error) => {
@@ -69,12 +78,12 @@ export function useConfirmReceipt() {
   });
 }
 
-export function useReceipts(filters) {
+export function useReceipts(filters = {}) {
+  const params = cleanFilters(filters);
   return useQuery({
-    queryKey: ['receipts', filters],
+    queryKey: ['receipts', 'list', params],
     queryFn: async () => {
-      const params = new URLSearchParams(filters).toString();
-      const { data } = await api.get(`/intake/receipts?${params}`);
+      const { data } = await api.get('/intake/receipts', { params });
       return data;
     }
   });
@@ -82,7 +91,7 @@ export function useReceipts(filters) {
 
 export function useReceipt(id) {
   return useQuery({
-    queryKey: ['receipts', id],
+    queryKey: ['receipts', 'detail', id],
     queryFn: async () => {
       const { data } = await api.get(`/intake/receipts/${id}`);
       return data;

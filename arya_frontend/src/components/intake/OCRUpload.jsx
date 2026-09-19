@@ -1,28 +1,26 @@
 import React, { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, CheckCircle, FileText, Loader2 } from 'lucide-react';
-import { useVendors } from '@/hooks/useMaterials';
 import { useOCRUpload, useConfirmReceipt } from '@/hooks/useIntake';
 import { useIntakeStore } from '@/store/intakeStore';
+import { buildConfirmPayload, validateLineItems } from '@/lib/intake';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import OCRResultsTable from './OCRResultsTable';
+import ReceiptHeaderForm from './ReceiptHeaderForm';
 
 export default function OCRUpload() {
-  const { data: vendors, isLoading: vendorsLoading } = useVendors();
+  const navigate = useNavigate();
   const ocrMutation = useOCRUpload();
   const confirmMutation = useConfirmReceipt();
   const { toast } = useToast();
-  
-  const { vendor_id, po_number, receipt_date, receipt_id, line_items, bill_image_url } = useIntakeStore();
-  const { setVendorId, setPoNumber, setReceiptDate } = useIntakeStore();
-  
+
+  const { vendor_id, receipt_date, receipt_id, line_items } = useIntakeStore();
+  const resetIntake = useIntakeStore((s) => s.resetIntake);
+
   const [file, setFile] = useState(null);
   const [attempted, setAttempted] = useState(false);
-  const dateMissing = attempted && !receipt_date;
 
   const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles?.length > 0) {
@@ -33,10 +31,19 @@ export default function OCRUpload() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png'],
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp'],
       'application/pdf': ['.pdf']
     },
-    maxFiles: 1
+    maxFiles: 1,
+    maxSize: 10 * 1024 * 1024,
+    onDropRejected: (rejections) => {
+      const tooLarge = rejections.some((r) => r.errors.some((e) => e.code === 'file-too-large'));
+      toast({
+        title: 'File not accepted',
+        description: tooLarge ? 'The file is larger than 10 MB.' : 'Upload a JPG, PNG or WebP image, or a PDF.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const handleProcess = () => {
@@ -53,11 +60,11 @@ export default function OCRUpload() {
       toast({ title: 'File Required', description: 'Please upload a bill image.', variant: 'destructive' });
       return;
     }
-    
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('vendor_id', vendor_id);
-    
+
     ocrMutation.mutate(formData);
   };
 
@@ -65,87 +72,59 @@ export default function OCRUpload() {
     if (line_items.length === 0) return;
 
     setAttempted(true);
+    if (!vendor_id) {
+      toast({ title: 'Vendor Required', description: 'Please select a vendor.', variant: 'destructive' });
+      return;
+    }
     if (!receipt_date) {
       toast({ title: 'Receipt Date Required', description: 'Please enter the receipt date.', variant: 'destructive' });
       return;
     }
 
-    // Validate required fields
-    const invalidRows = line_items.filter(i => !i.location_code || !i.quality_grade);
-    if (invalidRows.length > 0) {
-      toast({ 
-        title: 'Validation Error', 
-        description: `Please set Location and Quality for all items. ${invalidRows.length} item(s) missing data.`, 
-        variant: 'destructive' 
+    const problems = validateLineItems(line_items);
+    if (problems.length > 0) {
+      const shown = problems.slice(0, 3).join(' • ');
+      toast({
+        title: 'Please fix the highlighted items',
+        description: problems.length > 3 ? `${shown} (+${problems.length - 3} more)` : shown,
+        variant: 'destructive',
       });
       return;
     }
 
-    confirmMutation.mutate({
-      vendor_id,
-      receipt_date,
-      po_number,
-      bill_image_url: bill_image_url || null,
-      line_items
+    // Read the freshest draft from the store rather than this render's snapshot.
+    confirmMutation.mutate(buildConfirmPayload(useIntakeStore.getState()), {
+      onSuccess: (data) => {
+        setFile(null);
+        setAttempted(false);
+        navigate(`/entry/history?id=${data.receipt_id}`);
+      },
     });
+  };
+
+  const handleCancel = () => {
+    resetIntake();
+    setFile(null);
+    setAttempted(false);
   };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-4">
-      {/* Header Form */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div className="space-y-2">
-          <Label htmlFor="vendor">Vendor <span className="text-red-500">*</span></Label>
-          <Select value={vendor_id || ''} onValueChange={setVendorId} disabled={!!receipt_id}>
-            <SelectTrigger id="vendor" className={!vendor_id ? "border-red-200" : ""}>
-              <SelectValue placeholder={vendorsLoading ? "Loading..." : "Select Vendor"} />
-            </SelectTrigger>
-            <SelectContent>
-              {vendors?.map(v => (
-                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="poNumber">PO Number</Label>
-          <Input 
-            id="poNumber" 
-            placeholder="e.g. PO-2026-0417" 
-            value={po_number}
-            onChange={(e) => setPoNumber(e.target.value)}
-            disabled={!!receipt_id}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="receiptDate">Receipt Date <span className="text-red-500">*</span></Label>
-          <Input 
-            id="receiptDate" 
-            type="date"
-            value={receipt_date}
-            onChange={(e) => setReceiptDate(e.target.value)}
-            disabled={!!receipt_id}
-            className={dateMissing ? 'border-red-400' : ''}
-          />
-          {dateMissing && <p className="text-xs text-red-500">Receipt date is required.</p>}
-        </div>
-      </div>
+      <ReceiptHeaderForm attempted={attempted} vendorLocked={!!receipt_id} />
 
       {/* Upload Zone (Only show before processing) */}
       {!receipt_id && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-lg font-medium text-slate-800 mb-4">Upload Bill</h3>
-          
-          <div 
-            {...getRootProps()} 
+
+          <div
+            {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-12 flex flex-col items-center justify-center cursor-pointer transition-colors ${
               isDragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
             }`}
           >
             <input {...getInputProps()} />
-            
+
             {file ? (
               <div className="flex flex-col items-center text-center">
                 <FileText className="h-12 w-12 text-blue-500 mb-3" />
@@ -157,14 +136,14 @@ export default function OCRUpload() {
               <div className="flex flex-col items-center text-center">
                 <UploadCloud className="h-12 w-12 text-slate-400 mb-3" />
                 <p className="font-medium text-slate-700">Drag & drop your bill here</p>
-                <p className="text-sm text-slate-500 mt-1">or click to select a file (PDF, JPG, PNG)</p>
+                <p className="text-sm text-slate-500 mt-1">or click to select a file (PDF, JPG, PNG — up to 10 MB)</p>
               </div>
             )}
           </div>
 
           <div className="mt-6 flex justify-end">
-            <Button 
-              onClick={handleProcess} 
+            <Button
+              onClick={handleProcess}
               disabled={!file || !vendor_id || ocrMutation.isPending}
               className="w-full sm:w-auto"
             >
@@ -193,16 +172,16 @@ export default function OCRUpload() {
               </div>
             )}
           </div>
-          
+
           <div className="flex-1 overflow-auto">
-             <OCRResultsTable isLoading={ocrMutation.isPending} />
+            <OCRResultsTable isLoading={ocrMutation.isPending} attempted={attempted} />
           </div>
 
           {receipt_id && (
             <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex justify-end gap-3">
-              <Button variant="outline" onClick={() => window.location.reload()}>Cancel</Button>
-              <Button 
-                onClick={handleConfirm} 
+              <Button variant="outline" onClick={handleCancel} disabled={confirmMutation.isPending}>Cancel</Button>
+              <Button
+                onClick={handleConfirm}
                 disabled={confirmMutation.isPending || line_items.length === 0}
               >
                 {confirmMutation.isPending ? (

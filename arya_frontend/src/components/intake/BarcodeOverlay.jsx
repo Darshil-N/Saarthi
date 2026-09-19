@@ -5,8 +5,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function BarcodeOverlay({ isActive, onDecode }) {
   const videoRef = useRef(null);
-  const codeReader = useRef(new BrowserMultiFormatReader());
+  const [codeReader] = useState(() => new BrowserMultiFormatReader());
   const [error, setError] = useState(null);
+
+  // Always call the latest handler without making it an effect dependency: a changing
+  // dependency would tear down and restart the camera every time the parent re-renders.
+  const onDecodeRef = useRef(onDecode);
+  useEffect(() => {
+    onDecodeRef.current = onDecode;
+  }, [onDecode]);
 
   useEffect(() => {
     if (!isActive || !videoRef.current) return;
@@ -16,12 +23,12 @@ export default function BarcodeOverlay({ isActive, onDecode }) {
 
     const startScanning = async () => {
       try {
-        await codeReader.current.decodeFromVideoDevice(
+        await codeReader.decodeFromVideoDevice(
           undefined, // Use default camera
           videoRef.current,
-          (result, err) => {
+          (result) => {
             if (isComponentMounted && result) {
-              onDecode(result.getText());
+              onDecodeRef.current(result.getText());
             }
           }
         );
@@ -37,9 +44,9 @@ export default function BarcodeOverlay({ isActive, onDecode }) {
 
     return () => {
       isComponentMounted = false;
-      codeReader.current.reset();
+      codeReader.reset();
     };
-  }, [isActive, onDecode]);
+  }, [isActive, codeReader]);
 
   if (error) {
     return (
@@ -59,7 +66,7 @@ export default function BarcodeOverlay({ isActive, onDecode }) {
            <p className="text-sm font-medium">Scanner Paused</p>
          </div>
       )}
-      
+
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
@@ -71,13 +78,13 @@ export default function BarcodeOverlay({ isActive, onDecode }) {
         <>
           {/* Overlay mask */}
           <div className="absolute inset-0 z-10 pointer-events-none border-[40px] border-black/40" />
-          
+
           {/* Scanning Box */}
           <div className="absolute inset-0 m-auto w-3/4 h-1/2 border-2 border-green-500 rounded z-20 pointer-events-none flex flex-col items-center justify-center">
              {/* Animated scanning line */}
              <div className="w-full h-0.5 bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)] animate-[scan_2s_ease-in-out_infinite]" />
           </div>
-          
+
           <div className="absolute bottom-4 left-0 w-full text-center z-20 pointer-events-none">
              <span className="bg-black/60 text-white text-xs px-3 py-1 rounded-full font-medium tracking-wide">
                Scanning...

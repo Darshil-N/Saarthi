@@ -3,16 +3,19 @@ import { useIntakeStore } from '@/store/intakeStore';
 import LineItemEditor from '@/components/intake/LineItemEditor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageOpen } from 'lucide-react';
+import { formatINR } from '@/lib/intake';
 import {
   Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 
-function formatINR(amount) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
-}
-
-export default function OCRResultsTable({ readOnly = false, isLoading = false }) {
-  const line_items = useIntakeStore((s) => s.line_items);
+/**
+ * Line-item table. Editable rows come from the intake draft in the store; pass `items`
+ * (with readOnly) to show any other list, such as a saved receipt's lines.
+ * `attempted` highlights incomplete rows after the user tried to confirm.
+ */
+export default function OCRResultsTable({ readOnly = false, isLoading = false, items, attempted = false }) {
+  const draftItems = useIntakeStore((s) => s.line_items);
+  const line_items = items ?? draftItems;
 
   if (isLoading) {
     return (
@@ -34,7 +37,10 @@ export default function OCRResultsTable({ readOnly = false, isLoading = false })
     );
   }
 
-  const total = line_items.reduce((sum, item) => sum + (item.total_price || 0), 0);
+  const total = line_items.reduce(
+    (sum, item) => sum + (item.total_price ?? (Number(item.quantity) || 0) * (Number(item.unit_price) || 0)),
+    0
+  );
 
   return (
     <div className="rounded-md border overflow-auto">
@@ -55,7 +61,7 @@ export default function OCRResultsTable({ readOnly = false, isLoading = false })
         </TableHeader>
         <TableBody>
           {line_items.map((item, i) => (
-            <LineItemEditor key={item.line_id} item={item} index={i} readOnly={readOnly} />
+            <LineItemEditor key={item.line_id} item={item} index={i} readOnly={readOnly} attempted={attempted} />
           ))}
         </TableBody>
         <TableFooter>
