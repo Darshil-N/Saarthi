@@ -3,6 +3,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException
 
+from google.api_core import exceptions as gexc
+
+from services.ai_common import AIEmptyResponseError, AIQuotaError, AIServiceError, _classify
 from services.cnmc_service import _segment, _validate_cnmc
 from services.json_utils import extract_json
 from services.matching_service import _map_to_match_status, _parse_verdict, is_auto_link
@@ -117,3 +120,22 @@ class TestRequireUuid:
         with pytest.raises(HTTPException) as exc:
             require_uuid(bad, "Receipt")
         assert exc.value.status_code == 404 and exc.value.detail == "Receipt not found"
+
+
+class TestGeminiErrorClassification:
+    def test_rate_limits_become_quota_errors(self):
+        assert isinstance(_classify(gexc.ResourceExhausted("429 quota")), AIQuotaError)
+        assert isinstance(_classify(gexc.TooManyRequests("slow down")), AIQuotaError)
+        assert AIQuotaError.status_code == 429
+
+    def test_blocked_or_empty_replies_are_empty_response_errors(self):
+        # response.text raises ValueError when the reply was blocked or had no candidates
+        assert isinstance(_classify(ValueError("blocked")), AIEmptyResponseError)
+
+    def test_everything_else_is_a_generic_502(self):
+        err = _classify(gexc.ServiceUnavailable("down"))
+        assert type(err) is AIServiceError and err.status_code == 502
+        assert isinstance(_classify(RuntimeError("weird")), AIServiceError)
+
+    def test_user_messages_do_not_leak_provider_details(self):
+        assert "429" not in _classify(gexc.ResourceExhausted("429 secret detail")).user_message

@@ -28,7 +28,7 @@ This replaces the original build plan (still available in git history). Progress
 | D-3 | DECIDED | One consistent dataset replaces the random seeds. | Stated by the user. | Phase 8 |
 | D-4 | DECIDED (approach) | shrindhi/: user said 'whatever is convenient'. Approach: port what is useful (MaterialDetail layout), then remove the app. Removal still needs explicit approval at that time. | Chosen as the least-effort route that loses nothing. | 5.1.8, 9.1.2 |
 | D-5 | DECIDED (partly open) | NL→SQL uses a real Gemini call within free-tier limits; Ollama with Mistral or DeepSeek as demo fallback. | Open: Ollama runs on a local machine, so a hosted (Render) demo cannot reach it unless it is tunnelled or hosted elsewhere. Needs your answer before 4.1.1. | Phase 4 |
-| D-6 | PROPOSED | OCR becomes a read-only draft; materials, matches, inventory and price history are created in one transaction only when the receipt is confirmed. New materials start as 'pending'. | Fixes E2, E3, E4, E5 together. Needs your approval before 3.1.4 and 1.2.2. | 3.1.4, 1.2.2, 3.3.1 |
+| D-6 | PROPOSED | OCR becomes a read-only draft; materials, matches, inventory and price history are created in one transaction only when the receipt is confirmed. New materials start as 'pending'. | Fixes E2, E3, E4, E5 together. Needs your approval before 3.1.4 and 1.2.2. INTERIM (implemented 2026-09-19, no DB change): confirm now validates, books stock and writes price history in Python with undo-on-failure, and OCR still creates pending materials. Exact matches above the confidence threshold no longer create duplicates. The full redesign (read-only OCR draft, DB transaction) is still pending your approval. | 3.1.4, 1.2.2, 3.3.1 |
 | D-7 | OPEN | Approval authority: which roles may approve materials and mappings (currently entry operator, engineer and admin). | Needs your answer before 2.1.6. | 2.1.6 |
 | D-8 | OPEN | Engineer visibility of pending materials, and whether the Entry 'Locations' page is built or hidden. | Needs your answer before 5.1.2 and 3.4.12. | 5.1.2, 3.4.12 |
 
@@ -94,23 +94,23 @@ This replaces the original build plan (still available in git history). Progress
 
 ### Part 2.1 — Auth and access control
 
-- **2.1.1** Shared Supabase client and cached token verification (remove per-request client creation) _(refs: B5)_
-- **2.1.2** Reject users with no profile or is_active = false; remove role defaults _(refs: B4)_
-- **2.1.3** Real logout that revokes the user's session _(refs: B3)_
-- **2.1.4** Return generic auth errors; log details server-side _(refs: B6)_
-- **2.1.5** Enforce role checks on every endpoint (including /intake/confirm and /intake/barcode) _(refs: B1)_
+- **2.1.1** Shared Supabase client and cached token verification (remove per-request client creation) _(refs: B5)_ — Shared client + token cache implemented and unit-tested with fakes; not yet run against real Supabase Auth.
+- **2.1.2** Reject users with no profile or is_active = false; remove role defaults _(refs: B4)_ — No profile / deactivated user -> 403 (previously crashed with a 500 or silently became entry_operator). Unit-tested.
+- **2.1.3** Real logout that revokes the user's session _(refs: B3)_ — Logout revokes the session (admin.sign_out) and clears the cache; unit-tested with a fake. Real revoke not exercised; the UI logout button does not call /auth/logout yet (9.1.3).
+- **2.1.4** Return generic auth errors; log details server-side _(refs: B6)_ — Login/verification errors are generic; details are logged. Unit-tested.
+- **2.1.5** Enforce role checks on every endpoint (including /intake/confirm and /intake/barcode) _(refs: B1)_ — Role checks added to /intake/ocr, /confirm, /barcode. Review endpoints keep their roles pending D-7; read endpoints stay open to any signed-in role (matches RLS).
 - **2.1.6** Decide and implement the approval-authority matrix (who may approve materials / mappings) _(refs: B10 · ❓ Decision)_
-- **2.1.7** Replace .single() with maybe_single() and proper 404 handling _(refs: B2)_
+- **2.1.7** Replace .single() with maybe_single() and proper 404 handling _(refs: B2)_ — Every .single() in the backend replaced by maybe_single() with 404 handling; malformed ids give 404.
 
 ### Part 2.2 — Reliability and hygiene
 
-- **2.2.1** Structured logging and a global exception handler with request IDs (replace print) _(refs: B7, A7)_
-- **2.2.2** Dashboard stats: UTC-correct 'today', surface errors instead of returning 0 _(refs: B7)_
-- **2.2.3** Run blocking SDK calls (Gemini, Supabase) off the event loop _(refs: A3)_
-- **2.2.4** Config cleanup: drop unused JWT_SECRET / python-jose; add google-genai; pin and document deps _(refs: B9, A5)_
+- **2.2.1** Structured logging and a global exception handler with request IDs (replace print) _(refs: B7, A7)_ — Request-ID logging; unhandled errors return a JSON 500 that still carries CORS headers; print() removed. Tested.
+- **2.2.2** Dashboard stats: UTC-correct 'today', surface errors instead of returning 0 _(refs: B7)_ — 'Today' uses the business day (IST offset configurable); failures return 502 instead of zeros. The Home page shows the error.
+- **2.2.3** Run blocking SDK calls (Gemini, Supabase) off the event loop _(refs: A3)_ — Sync endpoints run in the thread pool; Gemini and Supabase calls inside async code use asyncio.to_thread.
+- **2.2.4** Config cleanup: drop unused JWT_SECRET / python-jose; add google-genai; pin and document deps _(refs: B9, A5)_ — Removed unused JWT_SECRET and python-jose; model names/thresholds/limits are now settings. Not done: add google-genai (needed with 3.2.3).
 - **2.2.5** Remove dead code (mismatched models, unused prompts, broken match_materials_rpc.sql) _(refs: B9 · 🗑 Delete)_ — File deletions need approval.
-- **2.2.6** Bounds and pagination limits on all list endpoints _(refs: B8)_
-- **2.2.7** pytest scaffold with mocked Supabase and Gemini; first tests for auth and role checks _(refs: Q3)_
+- **2.2.6** Bounds and pagination limits on all list endpoints _(refs: B8)_ — limit/offset bounds on materials, inventory and receipts.
+- **2.2.7** pytest scaffold with mocked Supabase and Gemini; first tests for auth and role checks _(refs: Q3)_ — 146 pytest tests with an in-memory fake Supabase (Arpit_Backend/tests). Run: venv\Scripts\python -m pytest
 
 ---
 
@@ -120,43 +120,43 @@ This replaces the original build plan (still available in git history). Progress
 
 ### Part 3.1 — OCR service
 
-- **3.1.1** Robust JSON extraction (fence-tolerant, request JSON mime type) _(refs: A1 · 🌐 Quota)_
-- **3.1.2** Distinguish 'unreadable bill' from quota/network errors in the API response _(refs: A1)_
-- **3.1.3** Validate and coerce OCR fields (null/strings/units) before use _(refs: A2)_
+- **3.1.1** Robust JSON extraction (fence-tolerant, request JSON mime type) _(refs: A1 · 🌐 Quota)_ — Fence-tolerant JSON extraction done and tested. Deliberately not done: forcing a JSON mime type, which cannot be tested without calling the live model.
+- **3.1.2** Distinguish 'unreadable bill' from quota/network errors in the API response _(refs: A1)_ — Unreadable bill -> 422, quota -> 429, AI outage -> 502; Gemini exception mapping tested with the real exception classes.
+- **3.1.3** Validate and coerce OCR fields (null/strings/units) before use _(refs: A2)_ — Numbers, units, ids and grades are normalised; junk rows are dropped instead of crashing. Tested.
 - **3.1.4** Make OCR a read-only draft: no materials, queue rows or audit rows before confirm _(refs: E4, E5, A7 · ❓ Decision)_ — Design change proposed in Decisions Log D-6.
-- **3.1.5** Signed URLs for the private bill-images bucket; correct file extension per type _(refs: A8)_
-- **3.1.6** Upload type/size validation with clear errors _(refs: E14, A8)_
+- **3.1.5** Signed URLs for the private bill-images bucket; correct file extension per type _(refs: A8)_ — Bills stored as paths in the private bucket; signed URLs on read; extension per type. Tested with fake storage; real Storage API not exercised.
+- **3.1.6** Upload type/size validation with clear errors _(refs: E14, A8)_ — Type/size validation (415/413/422) in the API and in the upload dropzone.
 
 ### Part 3.2 — Matching and CNMC
 
 - **3.2.1** Batch embeddings and parallelise per-line work; run post-confirm matching as a BackgroundTask _(refs: A3 · 🌐 Quota)_
-- **3.2.2** Use configured similarity thresholds; implement auto-resolve for high-confidence exact matches _(refs: A4)_
+- **3.2.2** Use configured similarity thresholds; implement auto-resolve for high-confidence exact matches _(refs: A4)_ — Exact matches above SIMILARITY_EXACT link to the catalog without creating a pending duplicate (tested with a fake AI). Live-model behaviour not yet observed.
 - **3.2.3** Align stored and runtime embedding text and task type; re-embed materials _(refs: A5 · 🔒 DB 🌐 Quota)_ — Re-embedding writes to the database and uses Gemini quota.
-- **3.2.4** Centralise model names in config (no floating alias in code) _(refs: A6)_
-- **3.2.5** Guard CNMC generation with a deterministic fallback; uniqueness enforced at confirm time _(refs: A2, E5)_
+- **3.2.4** Centralise model names in config (no floating alias in code) _(refs: A6)_ — Model names, embedding model/dimensions and thresholds come from settings.
+- **3.2.5** Guard CNMC generation with a deterministic fallback; uniqueness enforced at confirm time _(refs: A2, E5)_ — Deterministic MISC-GEN fallback when Gemini fails (tested). CNMC uniqueness is still enforced at OCR time, not at confirm time.
 - **3.2.6** Match new lines of the same bill against each other _(refs: E5)_
 
 ### Part 3.3 — Confirm and receipts API
 
-- **3.3.1** POST /intake/confirm calls the transactional RPC; returns GR number and totals _(refs: E2, E3, E6)_
-- **3.3.2** Server-side validation: date default, quantity > 0, location exists, quality in A/B/C _(refs: E1, E3)_
-- **3.3.3** Idempotency key to prevent double-submit creating two receipts _(refs: E3)_
-- **3.3.4** GET /intake/receipts with vendor/status/date filters, gr_number, vendor name, total _(refs: E9, E10)_
-- **3.3.5** GET /intake/receipts/{id} with line items and material details _(refs: E8)_
-- **3.3.6** Approve/reject mapping endpoints use the RPC, require status = pending, write audit _(refs: E12)_
+- **3.3.1** POST /intake/confirm calls the transactional RPC; returns GR number and totals _(refs: E2, E3, E6)_ — Implemented in Python instead of a DB function: validate, save, book stock (optimistic concurrency), price history, audit, and undo everything on any failure. Verified against a fake PostgREST and a browser run; real database not yet exercised. The RPC in 1.2.2 is still the route to a true transaction.
+- **3.3.2** Server-side validation: date default, quantity > 0, location exists, quality in A/B/C _(refs: E1, E3)_ — Date, quantity > 0, price >= 0, grade A/B/C, vendor, locations, materials and line links are validated before anything is written; all problems are reported together.
+- **3.3.3** Idempotency key to prevent double-submit creating two receipts _(refs: E3)_ — Idempotent per client_draft_id (tested). Two simultaneous requests with the same id could both pass the check; a unique index (DB change) would close that.
+- **3.3.4** GET /intake/receipts with vendor/status/date filters, gr_number, vendor name, total _(refs: E9, E10)_ — Filters, gr_number, vendor name, total (tested against a fake PostgREST; live query syntax not yet exercised).
+- **3.3.5** GET /intake/receipts/{id} with line items and material details _(refs: E8)_ — Header + lines + material info + signed bill URL (tested against a fake PostgREST; live query not yet exercised).
+- **3.3.6** Approve/reject mapping endpoints use the RPC, require status = pending, write audit _(refs: E12)_ — Only pending matches can be reviewed (409 otherwise); update is compare-and-set; audit written. Merging stock / deprecating the duplicate still needs the approve_mapping RPC (1.2.3).
 
 ### Part 3.4 — Intake UI
 
-- **3.4.1** Default receipt date to today; validate before submit with inline errors _(refs: E1)_ — Code done: store defaults to local today; date required before OCR and before Confirm; inline error. Logic verified in Node + production build. Needs an in-browser check (requires live login, so awaiting your approval).
-- **3.4.2** Show real backend error messages in toasts _(refs: E1)_ — Code done: getApiErrorMessage() helper wired into OCR and confirm hooks; helper verified in Node against 422/string/500/network cases. Needs an in-browser check.
-- **3.4.3** After confirm: show GR number and navigate to the receipt detail _(refs: E1, E10)_
-- **3.4.4** Recompute line totals on edit; guard NaN; require quantity > 0 _(refs: E7)_
-- **3.4.5** Send edited description/CNMC in the confirm payload and honour it server-side _(refs: E6)_
-- **3.4.6** Cancel without page reload; clear file state; discard the draft cleanly _(refs: E4, E14)_
-- **3.4.7** Receipt History: working filters, correct status values, detail panel with its own state _(refs: E8, E9, E10)_
-- **3.4.8** Home page: open the clicked receipt via ?id; fix status colour map _(refs: E9, E11)_
-- **3.4.9** Pending Approvals: error toasts and result summary after approve/reject _(refs: E12)_
-- **3.4.10** Barcode tab: location dropdown, shared vendor/date header, stable onDecode, real new-material path _(refs: E13)_
+- **3.4.1** Default receipt date to today; validate before submit with inline errors _(refs: E1)_ — Date defaults to today, is required before OCR and Confirm, inline error. Browser-verified (Edge) against the real backend code + fake database.
+- **3.4.2** Show real backend error messages in toasts _(refs: E1)_ — Backend messages shown in toasts (422 lists, plain details, network errors). Browser-verified.
+- **3.4.3** After confirm: show GR number and navigate to the receipt detail _(refs: E1, E10)_ — Toast with GR number and item count; browser opens the saved receipt in Receipt History. Browser-verified.
+- **3.4.4** Recompute line totals on edit; guard NaN; require quantity > 0 _(refs: E7)_ — Numeric fields never become NaN, totals follow edits, incomplete rows are highlighted, the draft is validated before sending. Browser-verified.
+- **3.4.5** Send edited description/CNMC in the confirm payload and honour it server-side _(refs: E6)_ — Description edits are saved (as the bill text). CNMC is now read-only because the server does not persist CNMC edits. Incomplete until edits update the pending material.
+- **3.4.6** Cancel without page reload; clear file state; discard the draft cleanly _(refs: E4, E14)_ — Cancel resets the draft without reloading and clears the file. Pending materials created during OCR remain in the database (E4) until D-6.
+- **3.4.7** Receipt History: working filters, correct status values, detail panel with its own state _(refs: E8, E9, E10)_ — Filters sent to the API, correct status values, detail panel with own state and error handling. Browser-verified.
+- **3.4.8** Home page: open the clicked receipt via ?id; fix status colour map _(refs: E9, E11)_ — Home opens the clicked receipt via ?id; GR numbers and status colours fixed. Browser-verified.
+- **3.4.9** Pending Approvals: error toasts and result summary after approve/reject _(refs: E12)_ — Success/error toasts added (including 'already reviewed'); not exercised in a browser because the test fake has no matching-queue view.
+- **3.4.10** Barcode tab: location dropdown, shared vendor/date header, stable onDecode, real new-material path _(refs: E13)_ — Done: stable camera handler, one lookup per scan, location dropdown, shared header, scanned-items list, honest not-in-catalog message. Not done: creating a new material from an unknown barcode. Camera scanning cannot be tested headless.
 - **3.4.11** Separate OCR and barcode draft state _(refs: E14)_
 - **3.4.12** Locations page: implement a real read-only list, or hide the menu item _(refs: E15 · ❓ Decision)_
 

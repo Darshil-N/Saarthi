@@ -139,20 +139,23 @@ async def _build_line_item(supabase: Client, raw: dict, vendor_id: str | None, u
         cnmc = pending_material.get("cnmc")
 
         if pending_id and generated:
-            log_action(supabase, user.id, user.role, "cnmc_generated", "materials", pending_id, None, {"cnmc": cnmc})
+            await asyncio.to_thread(
+                log_action, supabase, user.id, user.role, "cnmc_generated", "materials", pending_id, None, {"cnmc": cnmc}
+            )
 
         # matching_queue.matched_material_id is NOT NULL, so only lines that resemble something are queued.
         if pending_id and matched_id:
+            queue_row = {
+                "new_material_id": pending_id,
+                "matched_material_id": matched_id,
+                "match_type": match["match_type"],
+                "confidence_score": match["confidence"],
+                "vector_similarity": match["vector_similarity"],
+                "match_reason": match["match_reason"],
+                "status": "pending",
+            }
             try:
-                supabase.table("matching_queue").insert({
-                    "new_material_id": pending_id,
-                    "matched_material_id": matched_id,
-                    "match_type": match["match_type"],
-                    "confidence_score": match["confidence"],
-                    "vector_similarity": match["vector_similarity"],
-                    "match_reason": match["match_reason"],
-                    "status": "pending",
-                }).execute()
+                await asyncio.to_thread(lambda: supabase.table("matching_queue").insert(queue_row).execute())
             except Exception:
                 logger.exception("Could not queue %s for review", pending_id)
 
