@@ -1,8 +1,8 @@
 # Saarthi — Progress Tracker
 
-**Last updated:** 2026-09-22 — all five open decisions (D-1, D-5, D-6, D-7, D-8) resolved by the user; D-7 applied in code; Phase 1 access-control migration and Phase 0.3 baseline-check queries drafted for the user to run manually
-**Overall:** 26 / 146 steps complete
-**Status:** 🟡 In progress — Phase 2 and most of Phase 3 done; no open decisions remain; next unblockers are the user running `migrations/000_baseline_checks.sql` and `migrations/001_access_control.sql`
+**Last updated:** 2026-09-22 — decisions resolved, D-7 applied in code, and the user has run `001_access_control.sql` against the live database (profiles_insert_self removed, matching_queue policies widened — confirmed); a few of its statements still need direct live confirmation (see 1.1.1, 1.1.3-1.1.6)
+**Overall:** 27 / 146 steps complete
+**Status:** 🟡 In progress — no open decisions remain; Phase 1.1 access control is live and mostly confirmed; next is Phase 1.2 (transactional RPCs for confirm/approve)
 
 ## How to use this file
 
@@ -16,7 +16,7 @@
 
 | Phase | Name | Done | Status |
 |---|---|---|---|
-| 0 | Governance, Decisions & Live-DB Baseline | 7 / 13 | 🟡 In progress |
+| 0 | Governance, Decisions & Live-DB Baseline | 8 / 13 | 🟡 In progress |
 | 1 | Database Security & Schema Fixes | 0 / 14 | ⚪ Not started |
 | 2 | Backend Foundation | 8 / 14 | 🟡 In progress |
 | 3 | Intake Pipeline (OCR, Barcode, Confirm, Matching) | 11 / 30 | 🟡 In progress |
@@ -59,7 +59,7 @@
 | 0.3.3 | Check anon/authenticated grants on views and RPCs, and view security_invoker setting | [ ] | D3 | 🔒 DB | Queries ready in `migrations/000_baseline_checks.sql` (0.3.3a-c). Awaiting the user to run them and report back. |
 | 0.3.4 | Check whether inventory is in the supabase_realtime publication | [ ] | G5 | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.4). Awaiting the user to run it and report back. |
 | 0.3.5 | Inspect vector index definition and test candidate recall | [ ] | D4 | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.5). Awaiting the user to run it and report back. |
-| 0.3.6 | Capture per-table row counts as the baseline for the dataset work | [ ] |  | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.6). Awaiting the user to run it and report back. |
+| 0.3.6 | Capture per-table row counts as the baseline for the dataset work | [x] |  | 🔒 DB | Run 2026-09-22: vendors 10, materials 30, locations 35, inventory 14, goods_receipts 3, gr_line_items 3, price_history 15, matching_queue 9, audit_log 10, nl_query_log 11, profiles 8. This is today's random-seed data, not the Phase 8 dataset. |
 
 ---
 
@@ -70,12 +70,12 @@
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 1.1.1 | Restrict profiles self-update so role and is_active cannot be changed by the user | [~] | D1 | 🔒 DB | SQL written as a BEFORE UPDATE trigger in `migrations/001_access_control.sql`. Not applied — awaiting the user to run the migration. |
-| 1.1.2 | Remove or constrain profiles_insert_self | [~] | D1 | 🔒 DB | `DROP POLICY` written in `migrations/001_access_control.sql`. Not applied — awaiting the user to run the migration. |
-| 1.1.3 | Make handle_new_user ignore metadata role; default to least privilege | [~] | D2 | 🔒 DB | Rewritten in `migrations/001_access_control.sql`: role always defaults to entry_operator, is_active defaults to FALSE (admin must activate). Product-visible onboarding change — flag if you want a different default. Not applied — awaiting the user to run the migration. |
-| 1.1.4 | Make views security_invoker (or grant explicitly) so RLS applies | [~] | D3 | 🔒 DB | `ALTER VIEW ... SET (security_invoker = on)` written for all 4 views in `migrations/001_access_control.sql`. Not applied — awaiting the user to run the migration. |
-| 1.1.5 | Revoke blanket anon grants on tables, views and routines; grant only what is needed | [~] | D3 | 🔒 DB | `REVOKE ALL ... FROM anon, authenticated` written in `migrations/001_access_control.sql` (safe per D-1: the frontend makes no direct Supabase calls). Not applied — awaiting the user to run the migration. |
-| 1.1.6 | Add SET search_path to all SECURITY DEFINER functions | [~] | D3 | 🔒 DB | `get_my_role`, `get_inventory_value_by_category`, `get_admin_dashboard_stats` rewritten with `SET search_path = public` in `migrations/001_access_control.sql`; `get_my_role` also now returns NULL for a deactivated profile (defense in depth). Not applied — awaiting the user to run the migration. |
+| 1.1.1 | Restrict profiles self-update so role and is_active cannot be changed by the user | [~] | D1 | 🔒 DB | SQL run 2026-09-22 as part of `001_access_control.sql`. No error was reported and later statements in the same script committed (see 1.1.2), which is indirect evidence this trigger was created too, but it hasn't been directly queried on the live DB yet. Ask: run `SELECT tgname FROM pg_trigger WHERE tgrelid = 'public.profiles'::regclass;` and confirm `trg_prevent_self_privilege_escalation` is there. |
+| 1.1.2 | Remove or constrain profiles_insert_self | [x] | D1 | 🔒 DB | Confirmed live 2026-09-22: `profiles_insert_self` no longer appears in `pg_policies` for `profiles`. |
+| 1.1.3 | Make handle_new_user ignore metadata role; default to least privilege | [~] | D2 | 🔒 DB | Run 2026-09-22 as part of `001_access_control.sql` (indirect evidence — see 1.1.1's note). Not yet directly confirmed live, and not yet exercised by an actual new sign-up. |
+| 1.1.4 | Make views security_invoker (or grant explicitly) so RLS applies | [~] | D3 | 🔒 DB | Run 2026-09-22 as part of `001_access_control.sql` (indirect evidence — see 1.1.1's note). Ask: paste the output of `000_baseline_checks.sql`'s 0.3.3b query to confirm all 4 views show `security_invoker=on` in `reloptions`. |
+| 1.1.5 | Revoke blanket anon grants on tables, views and routines; grant only what is needed | [~] | D3 | 🔒 DB | Run 2026-09-22 as part of `001_access_control.sql` (indirect evidence — see 1.1.1's note). This is the most security-critical one — ask: paste the output of the final `anon, authenticated` grants check at the bottom of `001_access_control.sql` (expect zero rows) to close it out. |
+| 1.1.6 | Add SET search_path to all SECURITY DEFINER functions | [~] | D3 | 🔒 DB | Run 2026-09-22 as part of `001_access_control.sql` (indirect evidence — see 1.1.1's note). Ask: paste the output of `000_baseline_checks.sql`'s 0.3.3c query to confirm `proconfig` includes `search_path=public` for `get_my_role`, `get_inventory_value_by_category` and `get_admin_dashboard_stats`. |
 
 ## Part 1.2 — Migrations and schema alignment  (0 / 8)
 
@@ -475,3 +475,5 @@ Known gaps you may notice: approving a mapping does not merge stock yet (E12); u
 - `migrations/` folder created (step 1.2.1, partial): `README.md` documents the numbered-migration workflow; `000_baseline_checks.sql` has every Phase 0.3 read-only query ready to run; `001_access_control.sql` has the full Phase 1.1 fix (D1, D2, D3) plus the D-7 RLS widening for `matching_queue`, written directly against `schema.sql`'s current definitions. Confirmed the two `schema.sql` copies are byte-identical (finding D5). Nothing was run against the live database — both files are waiting on the user.
 - No deletions made (duplicate `schema.sql`, dead code, mock data files all still need separate approval when reached).
 - Next: the user runs `000_baseline_checks.sql` and reports the results, then runs `001_access_control.sql` and reports the results, so Phase 0.3 and Phase 1.1 can be marked verified. In parallel, Claude will continue Phase 1.2 (the confirm_receipt and approve_mapping RPCs the D-6 redesign needs), Phase 2/3 remaining non-DB steps, and Phase 9 structure work.
+
+- Later the same day: the user ran `001_access_control.sql` (and `000_baseline_checks.sql`'s row-count query) against the live database. Confirmed directly: `profiles_insert_self` policy is gone (1.1.2 done); `matching_queue` policies are now `matching_select_reviewers`/`matching_update_reviewers` (D-7's RLS widening applied). Baseline row counts captured (0.3.6 done) — today's random-seed data, not the Phase 8 dataset. Steps 1.1.1, 1.1.3, 1.1.4, 1.1.5, 1.1.6 ran in the same script (indirect evidence they succeeded — no error was reported and later statements in the file committed) but are marked `[~]` rather than `[x]` until their specific live-state queries are confirmed directly; asked the user for those outputs plus 0.3.1 (Auth sign-up setting) and 0.3.2/0.3.4/0.3.5 (not yet shared). Not yet started: the 1.2.2/1.2.3 confirm_receipt/approve_mapping RPCs — this is a genuinely large, cross-stack piece (RPC design + the D-6 OCR-as-draft rewiring in `ocr_service.py`/`intake.py`/frontend), being designed properly as its own unit of work rather than rushed.
