@@ -20,7 +20,8 @@ so the corresponding plan.md/progress.md steps can be marked done.
 | File | Type | What it does |
 |---|---|---|
 | `000_baseline_checks.sql` | Read-only | Phase 0.3 — queries the live database's current RLS policies, grants, `security_invoker` settings, realtime publication membership, vector index definition and per-table row counts. Nothing is changed. Run this first and paste back the output — it confirms the `db-unverified` audit findings before `001` is applied. |
-| `001_access_control.sql` | Write (DDL) | Phase 1.1 — closes the privilege-escalation and RLS/grant holes found in the audit (D1, D2, D3) and applies decision D-7 (which roles may review material/mapping matches). |
+| `001_access_control.sql` | Write (DDL) | Phase 1.1 — closes the privilege-escalation and RLS/grant holes found in the audit (D1, D2, D3) and applies decision D-7 (which roles may review material/mapping matches). **Applied 2026-09-22.** |
+| `002_confirm_and_approve_rpcs.sql` | Write (DDL, additive) | Phase 1.2 — the `confirm_receipt` and `approve_mapping` transactional functions (steps 1.2.2, 1.2.3), plus a `client_draft_id` column on `goods_receipts`. Safe to run any time: it only adds a nullable column, an index and two new functions — nothing currently running calls them yet, so this changes no live behaviour by itself. The backend needs to be switched over to call these (separate, not-yet-done work) before they take effect. |
 
 `schema.sql` (repo root and `Arpit_Backend/`, currently identical copies — audit
 finding D5) stays as the historical "run this on a brand-new empty database" bootstrap
