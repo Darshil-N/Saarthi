@@ -1,8 +1,8 @@
 # Saarthi — Progress Tracker
 
-**Last updated:** 2026-09-19 — intake pipeline fixed end to end and verified against fakes (146 backend tests + 27 browser checks); awaiting manual test on the real stack
-**Overall:** 25 / 146 steps complete
-**Status:** 🟡 In progress — Phase 2 and most of Phase 3 done; decisions D-1, D-5, D-6, D-7, D-8 still open
+**Last updated:** 2026-09-22 — all five open decisions (D-1, D-5, D-6, D-7, D-8) resolved by the user; D-7 applied in code; Phase 1 access-control migration and Phase 0.3 baseline-check queries drafted for the user to run manually
+**Overall:** 26 / 146 steps complete
+**Status:** 🟡 In progress — Phase 2 and most of Phase 3 done; no open decisions remain; next unblockers are the user running `migrations/000_baseline_checks.sql` and `migrations/001_access_control.sql`
 
 ## How to use this file
 
@@ -16,7 +16,7 @@
 
 | Phase | Name | Done | Status |
 |---|---|---|---|
-| 0 | Governance, Decisions & Live-DB Baseline | 6 / 13 | 🟡 In progress |
+| 0 | Governance, Decisions & Live-DB Baseline | 7 / 13 | 🟡 In progress |
 | 1 | Database Security & Schema Fixes | 0 / 14 | ⚪ Not started |
 | 2 | Backend Foundation | 8 / 14 | 🟡 In progress |
 | 3 | Intake Pipeline (OCR, Barcode, Confirm, Matching) | 11 / 30 | 🟡 In progress |
@@ -46,7 +46,7 @@
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 0.2.1 | Decide data-access pattern: FastAPI for everything vs. direct Supabase for reads | [ ] | Q5 | ❓ Decision | Open. See Decisions Log D-1. |
+| 0.2.1 | Decide data-access pattern: FastAPI for everything vs. direct Supabase for reads | [x] | Q5 | ❓ Decision | Decided 2026-09-22: FastAPI for everything. See Decisions Log D-1. |
 | 0.2.2 | Approve the order of the fix phases in this plan | [x] |  | ❓ Decision | Approved by the user on 2026-09-19. |
 | 0.2.3 | Commit the existing uncommitted working tree locally (12 modified files + seed_demo_data.py) | [x] | Q4 | ❓ Decision | Local commit 5cedcce; nothing pushed. |
 
@@ -54,12 +54,12 @@
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 0.3.1 | Check whether public sign-up is enabled in Supabase Auth | [ ] | D2 | 🔒 DB |  |
-| 0.3.2 | List live RLS policies on profiles | [ ] | D1 | 🔒 DB |  |
-| 0.3.3 | Check anon/authenticated grants on views and RPCs, and view security_invoker setting | [ ] | D3 | 🔒 DB |  |
-| 0.3.4 | Check whether inventory is in the supabase_realtime publication | [ ] | G5 | 🔒 DB |  |
-| 0.3.5 | Inspect vector index definition and test candidate recall | [ ] | D4 | 🔒 DB |  |
-| 0.3.6 | Capture per-table row counts as the baseline for the dataset work | [ ] |  | 🔒 DB |  |
+| 0.3.1 | Check whether public sign-up is enabled in Supabase Auth | [ ] | D2 | 🔒 DB | Query prepared in `migrations/000_baseline_checks.sql`; this one is a dashboard setting, not SQL. Awaiting the user to check and report back. |
+| 0.3.2 | List live RLS policies on profiles | [ ] | D1 | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.2). Awaiting the user to run it and report back. |
+| 0.3.3 | Check anon/authenticated grants on views and RPCs, and view security_invoker setting | [ ] | D3 | 🔒 DB | Queries ready in `migrations/000_baseline_checks.sql` (0.3.3a-c). Awaiting the user to run them and report back. |
+| 0.3.4 | Check whether inventory is in the supabase_realtime publication | [ ] | G5 | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.4). Awaiting the user to run it and report back. |
+| 0.3.5 | Inspect vector index definition and test candidate recall | [ ] | D4 | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.5). Awaiting the user to run it and report back. |
+| 0.3.6 | Capture per-table row counts as the baseline for the dataset work | [ ] |  | 🔒 DB | Query ready in `migrations/000_baseline_checks.sql` (0.3.6). Awaiting the user to run it and report back. |
 
 ---
 
@@ -70,18 +70,18 @@
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 1.1.1 | Restrict profiles self-update so role and is_active cannot be changed by the user | [ ] | D1 | 🔒 DB |  |
-| 1.1.2 | Remove or constrain profiles_insert_self | [ ] | D1 | 🔒 DB |  |
-| 1.1.3 | Make handle_new_user ignore metadata role; default to least privilege | [ ] | D2 | 🔒 DB |  |
-| 1.1.4 | Make views security_invoker (or grant explicitly) so RLS applies | [ ] | D3 | 🔒 DB |  |
-| 1.1.5 | Revoke blanket anon grants on tables, views and routines; grant only what is needed | [ ] | D3 | 🔒 DB |  |
-| 1.1.6 | Add SET search_path to all SECURITY DEFINER functions | [ ] | D3 | 🔒 DB |  |
+| 1.1.1 | Restrict profiles self-update so role and is_active cannot be changed by the user | [~] | D1 | 🔒 DB | SQL written as a BEFORE UPDATE trigger in `migrations/001_access_control.sql`. Not applied — awaiting the user to run the migration. |
+| 1.1.2 | Remove or constrain profiles_insert_self | [~] | D1 | 🔒 DB | `DROP POLICY` written in `migrations/001_access_control.sql`. Not applied — awaiting the user to run the migration. |
+| 1.1.3 | Make handle_new_user ignore metadata role; default to least privilege | [~] | D2 | 🔒 DB | Rewritten in `migrations/001_access_control.sql`: role always defaults to entry_operator, is_active defaults to FALSE (admin must activate). Product-visible onboarding change — flag if you want a different default. Not applied — awaiting the user to run the migration. |
+| 1.1.4 | Make views security_invoker (or grant explicitly) so RLS applies | [~] | D3 | 🔒 DB | `ALTER VIEW ... SET (security_invoker = on)` written for all 4 views in `migrations/001_access_control.sql`. Not applied — awaiting the user to run the migration. |
+| 1.1.5 | Revoke blanket anon grants on tables, views and routines; grant only what is needed | [~] | D3 | 🔒 DB | `REVOKE ALL ... FROM anon, authenticated` written in `migrations/001_access_control.sql` (safe per D-1: the frontend makes no direct Supabase calls). Not applied — awaiting the user to run the migration. |
+| 1.1.6 | Add SET search_path to all SECURITY DEFINER functions | [~] | D3 | 🔒 DB | `get_my_role`, `get_inventory_value_by_category`, `get_admin_dashboard_stats` rewritten with `SET search_path = public` in `migrations/001_access_control.sql`; `get_my_role` also now returns NULL for a deactivated profile (defense in depth). Not applied — awaiting the user to run the migration. |
 
 ## Part 1.2 — Migrations and schema alignment  (0 / 8)
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 1.2.1 | Create a migrations/ folder; remove the duplicate schema.sql copy; document how to apply | [ ] | D5 | 🗑 Delete | Deleting one of the two identical copies needs approval. |
+| 1.2.1 | Create a migrations/ folder; remove the duplicate schema.sql copy; document how to apply | [~] | D5 | 🗑 Delete | `migrations/` folder created with a README explaining the numbered-file workflow (2026-09-22). Confirmed `schema.sql` and `Arpit_Backend/schema.sql` are byte-identical (finding D5). Not done: deleting one of the two copies, which needs approval. |
 | 1.2.2 | Confirm_receipt RPC: one transaction creating GR, lines, new materials, inventory upsert, price_history and audit rows | [ ] | E2, E3, E5, E6, A7 | 🔒 DB |  |
 | 1.2.3 | approve_mapping RPC: merge stock, repoint references, deprecate duplicate, audit | [ ] | E12 | 🔒 DB |  |
 | 1.2.4 | Read-only NL-query executor (restricted role or RPC with statement timeout, allow-listed views) | [ ] | G1 | 🔒 DB |  |
@@ -104,7 +104,7 @@
 | 2.1.3 | Real logout that revokes the user's session | [~] | B3 |  | Logout revokes the session (admin.sign_out) and clears the cache; unit-tested with a fake. Real revoke not exercised; the UI logout button does not call /auth/logout yet (9.1.3). |
 | 2.1.4 | Return generic auth errors; log details server-side | [x] | B6 |  | Login/verification errors are generic; details are logged. Unit-tested. |
 | 2.1.5 | Enforce role checks on every endpoint (including /intake/confirm and /intake/barcode) | [~] | B1 |  | Role checks added to /intake/ocr, /confirm, /barcode. Review endpoints keep their roles pending D-7; read endpoints stay open to any signed-in role (matches RLS). |
-| 2.1.6 | Decide and implement the approval-authority matrix (who may approve materials / mappings) | [ ] | B10 | ❓ Decision |  |
+| 2.1.6 | Decide and implement the approval-authority matrix (who may approve materials / mappings) | [~] | B10 | ❓ Decision | Decided 2026-09-22 (D-7): entry_operator, engineer, accounts and admin may all approve. Implemented for match review (see 3.3.6). Not yet implemented for materials, since the material-governance approve endpoints (7.1.1) don't exist yet. |
 | 2.1.7 | Replace .single() with maybe_single() and proper 404 handling | [x] | B2 |  | Every .single() in the backend replaced by maybe_single() with 404 handling; malformed ids give 404. |
 
 ## Part 2.2 — Reliability and hygiene  (5 / 7)
@@ -131,7 +131,7 @@
 | 3.1.1 | Robust JSON extraction (fence-tolerant, request JSON mime type) | [~] | A1 | 🌐 Quota | Fence-tolerant JSON extraction done and tested. Deliberately not done: forcing a JSON mime type, which cannot be tested without calling the live model. |
 | 3.1.2 | Distinguish 'unreadable bill' from quota/network errors in the API response | [x] | A1 |  | Unreadable bill -> 422, quota -> 429, AI outage -> 502; Gemini exception mapping tested with the real exception classes. |
 | 3.1.3 | Validate and coerce OCR fields (null/strings/units) before use | [x] | A2 |  | Numbers, units, ids and grades are normalised; junk rows are dropped instead of crashing. Tested. |
-| 3.1.4 | Make OCR a read-only draft: no materials, queue rows or audit rows before confirm | [ ] | E4, E5, A7 | ❓ Decision | Design change proposed in Decisions Log D-6. |
+| 3.1.4 | Make OCR a read-only draft: no materials, queue rows or audit rows before confirm | [ ] | E4, E5, A7 | ❓ Decision | Decided 2026-09-22 (D-6): full redesign approved. Not yet implemented — OCR still creates pending materials as of the 2026-09-19 interim fix. |
 | 3.1.5 | Signed URLs for the private bill-images bucket; correct file extension per type | [~] | A8 |  | Bills stored as paths in the private bucket; signed URLs on read; extension per type. Tested with fake storage; real Storage API not exercised. |
 | 3.1.6 | Upload type/size validation with clear errors | [x] | E14, A8 |  | Type/size validation (415/413/422) in the API and in the upload dropzone. |
 
@@ -155,7 +155,7 @@
 | 3.3.3 | Idempotency key to prevent double-submit creating two receipts | [~] | E3 |  | Idempotent per client_draft_id (tested). Two simultaneous requests with the same id could both pass the check; a unique index (DB change) would close that. |
 | 3.3.4 | GET /intake/receipts with vendor/status/date filters, gr_number, vendor name, total | [~] | E9, E10 |  | Filters, gr_number, vendor name, total (tested against a fake PostgREST; live query syntax not yet exercised). |
 | 3.3.5 | GET /intake/receipts/{id} with line items and material details | [~] | E8 |  | Header + lines + material info + signed bill URL (tested against a fake PostgREST; live query not yet exercised). |
-| 3.3.6 | Approve/reject mapping endpoints use the RPC, require status = pending, write audit | [~] | E12 |  | Only pending matches can be reviewed (409 otherwise); update is compare-and-set; audit written. Merging stock / deprecating the duplicate still needs the approve_mapping RPC (1.2.3). |
+| 3.3.6 | Approve/reject mapping endpoints use the RPC, require status = pending, write audit | [~] | E12 |  | Only pending matches can be reviewed (409 otherwise); update is compare-and-set; audit written. Reviewer role list widened 2026-09-22 to entry_operator/engineer/accounts/admin per decision D-7 (`matching.py` `_REVIEWERS`); test updated, 146 tests pass. Merging stock / deprecating the duplicate still needs the approve_mapping RPC (1.2.3). |
 
 ## Part 3.4 — Intake UI  (6 / 12)
 
@@ -172,7 +172,7 @@
 | 3.4.9 | Pending Approvals: error toasts and result summary after approve/reject | [~] | E12 |  | Success/error toasts added (including 'already reviewed'); not exercised in a browser because the test fake has no matching-queue view. |
 | 3.4.10 | Barcode tab: location dropdown, shared vendor/date header, stable onDecode, real new-material path | [~] | E13 |  | Done: stable camera handler, one lookup per scan, location dropdown, shared header, scanned-items list, honest not-in-catalog message. Not done: creating a new material from an unknown barcode. Camera scanning cannot be tested headless. |
 | 3.4.11 | Separate OCR and barcode draft state | [ ] | E14 |  |  |
-| 3.4.12 | Locations page: implement a real read-only list, or hide the menu item | [ ] | E15 | ❓ Decision |  |
+| 3.4.12 | Locations page: implement a real read-only list, or hide the menu item | [ ] | E15 | ❓ Decision | Decided 2026-09-22 (D-8): build a real, simple read-only list. Not yet implemented. |
 
 ---
 
@@ -183,7 +183,7 @@
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 4.1.1 | LLM provider abstraction: Gemini by default; Ollama (Mistral or DeepSeek) as demo fallback | [ ] | G1 | ❓ Decision | Deployed-demo hosting of Ollama is an open question (D-5). |
+| 4.1.1 | LLM provider abstraction: Gemini by default; Ollama (Mistral or DeepSeek) as demo fallback | [ ] | G1 | ❓ Decision | Decided 2026-09-22 (D-5): keep Ollama as a fallback provider; build the abstraction so it can be swapped in. Deployed-demo hosting of Ollama is still an open question, separate from this step. Not yet implemented. |
 | 4.1.2 | Schema-aware prompt limited to approved views with column descriptions and examples | [ ] | G1 | 🌐 Quota |  |
 | 4.1.3 | SQL safety validator: single SELECT, allow-listed views, forced LIMIT, no functions/comments | [ ] | G1 |  |  |
 | 4.1.4 | Executor uses the read-only role/RPC with a statement timeout | [ ] | G1 |  |  |
@@ -209,7 +209,7 @@
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
 | 5.1.1 | Engineer Home: correct columns, low-stock from v_low_stock_alerts / reorder levels | [ ] | G3 |  |  |
-| 5.1.2 | Decide whether engineers may see pending materials (RLS) or the KPIs are relabelled | [ ] | G7 | ❓ Decision |  |
+| 5.1.2 | Decide whether engineers may see pending materials (RLS) or the KPIs are relabelled | [ ] | G7 | ❓ Decision | Decided 2026-09-22 (D-8): engineers may see pending materials; KPIs are not relabelled. Not yet implemented (Phase 5 not started). |
 | 5.1.3 | Inventory map built from locations (empty bins shown) joined with inventory | [ ] | G5 |  |  |
 | 5.1.4 | Bin colours from each row's reorder_level and max_stock | [ ] | G5 |  |  |
 | 5.1.5 | Realtime updates working, or remove the 'Live' label | [ ] | G5 | ❓ Decision |  |
@@ -466,3 +466,12 @@ Known gaps you may notice: approving a mapping does not merge stock yet (E12); u
 - Frontend (commit `27bd990`): GR number + redirect, shared header, editor validation, receipt history, home fixes, barcode fixes.
 - Verification: 146 backend tests; production build; 27-check browser run (Edge via Playwright) of the real frontend against the real backend code with an in-memory fake database. No Supabase or Gemini call was made; no database was touched.
 - Steps 3.4.1 + 3.4.2 (audit E1): receipt date now defaults to today and is validated before OCR/Confirm with an inline error; intake toasts show the backend error text. Files: `intakeStore.js`, `useIntake.js`, `lib/utils.js`, `OCRUpload.jsx`. Verified: Node checks of store default/reset and error helper, production build. NOT yet verified in a browser (needs live login).
+
+### 2026-09-22
+- User asked to "complete everything." Given the plan's size (146 steps, ~20 of them 🔒 DB) and five open decisions the plan was explicitly written to stop at, asked clarifying questions before proceeding rather than guessing.
+- DB execution model clarified: the user runs every migration and every read against Supabase themselves. Claude's job on a 🔒 DB step is now to write the SQL as a reviewable file under `migrations/` and wait for the user to run it and report back — recorded in `plan.md`'s working rules and in the `supabase-manual-approval` memory.
+- All five open decisions resolved by the user: D-1 (FastAPI for everything), D-5 (keep Ollama as a fallback provider; hosting for a deployed demo still open), D-6 (full OCR-as-draft redesign approved), D-7 (entry_operator, engineer, accounts and admin may all approve materials/mappings), D-8 (engineers see pending materials; Locations page built read-only for real). Recorded in `plan.md`'s Decisions Log.
+- D-7 implemented in code (backend commit pending): `Arpit_Backend/routers/matching.py` `_REVIEWERS` widened to include `accounts`; `tests/test_routers.py` updated (renamed `test_accounts_role_cannot_review` to `test_accounts_role_can_review`). 146 backend tests still pass.
+- `migrations/` folder created (step 1.2.1, partial): `README.md` documents the numbered-migration workflow; `000_baseline_checks.sql` has every Phase 0.3 read-only query ready to run; `001_access_control.sql` has the full Phase 1.1 fix (D1, D2, D3) plus the D-7 RLS widening for `matching_queue`, written directly against `schema.sql`'s current definitions. Confirmed the two `schema.sql` copies are byte-identical (finding D5). Nothing was run against the live database — both files are waiting on the user.
+- No deletions made (duplicate `schema.sql`, dead code, mock data files all still need separate approval when reached).
+- Next: the user runs `000_baseline_checks.sql` and reports the results, then runs `001_access_control.sql` and reports the results, so Phase 0.3 and Phase 1.1 can be marked verified. In parallel, Claude will continue Phase 1.2 (the confirm_receipt and approve_mapping RPCs the D-6 redesign needs), Phase 2/3 remaining non-DB steps, and Phase 9 structure work.

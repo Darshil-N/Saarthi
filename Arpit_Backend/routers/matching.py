@@ -9,8 +9,8 @@ from services.validators import require_uuid
 
 router = APIRouter()
 
-# Who may review mappings is an open product decision (plan D-7); this keeps today's behaviour.
-_REVIEWERS = ("entry_operator", "engineer", "admin")
+# Plan D-7 (decided 2026-09-22): entry operator, engineer, accounts and admin may all review mappings.
+_REVIEWERS = ("entry_operator", "engineer", "accounts", "admin")
 
 
 @router.get("")

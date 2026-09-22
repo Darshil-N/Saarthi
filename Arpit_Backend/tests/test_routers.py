@@ -41,10 +41,12 @@ class TestMatchingReview:
     def test_malformed_id_is_404_not_500(self, client):
         assert client.patch("/matching/not-a-uuid/approve").status_code == 404
 
-    def test_accounts_role_cannot_review(self, client_as, db):
+    def test_accounts_role_can_review(self, client_as, db):
+        # Plan D-7 (decided 2026-09-22): accounts is one of the four roles allowed to review mappings.
         match = seed_match(db)
-        assert client_as("accounts").patch(f"/matching/{match['id']}/approve").status_code == 403
-        assert db.rows("matching_queue")[0]["status"] == "pending"
+        r = client_as("accounts").patch(f"/matching/{match['id']}/approve")
+        assert r.status_code == 200 and r.json()["status"] == "approved"
+        assert db.rows("matching_queue")[0]["status"] == "approved"
 
     def test_list_pending_only(self, client, db):
         db.seed("v_matching_queue_detailed", status="pending", id="a")

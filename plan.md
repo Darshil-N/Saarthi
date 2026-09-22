@@ -7,7 +7,7 @@ This replaces the original build plan (still available in git history). Progress
 ## Working rules (apply to every step)
 
 1. Nothing in the project is changed without the user's explicit go-ahead.
-2. No database read or write without the user's approval, one action at a time.
+2. No database read or write without the user's approval, one action at a time. Clarified 2026-09-22: the user runs every migration and every read against Supabase themselves. Claude's job on any 🔒 DB step is to write the SQL as a reviewable file (under `migrations/`) and wait for the user to run it and report back the result before the step is marked done — Claude does not execute Supabase reads or writes itself, even with per-action approval.
 3. plan.md (this file) and progress.md are kept current after every change.
 4. Production-grade code quality.
 5. No push to any remote without approval; local commits are fine.
@@ -23,14 +23,14 @@ This replaces the original build plan (still available in git history). Progress
 
 | ID | Status | Decision / question | Notes | Affects |
 |---|---|---|---|---|
-| D-1 | OPEN | Data-access pattern: send all reads and writes through FastAPI (audited, role-checked, one place for logic) or keep direct Supabase reads under RLS. | Recommended: FastAPI for all writes and anything needing audit or validation; direct Supabase reads only where RLS is verified sufficient. Needs your answer. | 0.2.1, Phases 5–7 |
+| D-1 | DECIDED | Data-access pattern: send all reads and writes through FastAPI (audited, role-checked, one place for logic) or keep direct Supabase reads under RLS. | Decided 2026-09-22: FastAPI for everything. Confirmed the frontend already has no direct `supabase.from()/.rpc()` calls, so this needs no frontend rework — it constrains how Phases 4-7 are built. | 0.2.1, Phases 5–7 |
 | D-2 | DECIDED | Every dashboard reads real database data; no mock or random data in the app. | Stated by the user. | Phase 6, 8 |
 | D-3 | DECIDED | One consistent dataset replaces the random seeds. | Stated by the user. | Phase 8 |
 | D-4 | DECIDED (approach) | shrindhi/: user said 'whatever is convenient'. Approach: port what is useful (MaterialDetail layout), then remove the app. Removal still needs explicit approval at that time. | Chosen as the least-effort route that loses nothing. | 5.1.8, 9.1.2 |
-| D-5 | DECIDED (partly open) | NL→SQL uses a real Gemini call within free-tier limits; Ollama with Mistral or DeepSeek as demo fallback. | Open: Ollama runs on a local machine, so a hosted (Render) demo cannot reach it unless it is tunnelled or hosted elsewhere. Needs your answer before 4.1.1. | Phase 4 |
-| D-6 | PROPOSED | OCR becomes a read-only draft; materials, matches, inventory and price history are created in one transaction only when the receipt is confirmed. New materials start as 'pending'. | Fixes E2, E3, E4, E5 together. Needs your approval before 3.1.4 and 1.2.2. INTERIM (implemented 2026-09-19, no DB change): confirm now validates, books stock and writes price history in Python with undo-on-failure, and OCR still creates pending materials. Exact matches above the confidence threshold no longer create duplicates. The full redesign (read-only OCR draft, DB transaction) is still pending your approval. | 3.1.4, 1.2.2, 3.3.1 |
-| D-7 | OPEN | Approval authority: which roles may approve materials and mappings (currently entry operator, engineer and admin). | Needs your answer before 2.1.6. | 2.1.6 |
-| D-8 | OPEN | Engineer visibility of pending materials, and whether the Entry 'Locations' page is built or hidden. | Needs your answer before 5.1.2 and 3.4.12. | 5.1.2, 3.4.12 |
+| D-5 | DECIDED (hosting still open) | NL→SQL uses a real Gemini call within free-tier limits; Ollama with Mistral or DeepSeek as demo fallback. | Decided 2026-09-22: keep Ollama as a fallback provider — build 4.1.1's provider abstraction so Ollama can be swapped in. Still open: Ollama runs on a local machine, so a hosted (Render) demo cannot reach it unless it is tunnelled or hosted elsewhere; the deployed demo may show a clear fallback error until that hosting question is answered separately. | Phase 4 |
+| D-6 | DECIDED | OCR becomes a read-only draft; materials, matches, inventory and price history are created in one transaction only when the receipt is confirmed. New materials start as 'pending'. | Decided 2026-09-22: full redesign approved. Fixes E2, E3, E4, E5 together. Replaces the 2026-09-19 interim fix (Python-side validation/booking with undo-on-failure); that interim behaviour stays live until the redesign (3.1.4, 1.2.2, 3.3.1) is built and the transactional RPC is run by the user. | 3.1.4, 1.2.2, 3.3.1 |
+| D-7 | DECIDED | Approval authority: which roles may approve materials and mappings (currently entry operator, engineer and admin). | Decided 2026-09-22: entry operator, engineer, accounts and admin may all approve materials and mappings (broadened, not restricted, from the audit's B10 concern). Applies to the match approve/reject endpoints (matching.py `_REVIEWERS`) and to the not-yet-built material-governance endpoints (7.1.1). | 2.1.6, 3.3.6, 7.1.1 |
+| D-8 | DECIDED | Engineer visibility of pending materials, and whether the Entry 'Locations' page is built or hidden. | Decided 2026-09-22: engineers can see pending materials (KPIs are not relabelled to exclude them); the Locations page gets a real, simple read-only list rather than being hidden. | 5.1.2, 3.4.12 |
 
 ---
 
