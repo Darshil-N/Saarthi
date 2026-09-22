@@ -1,5 +1,3 @@
-import pytest
-
 from tests.conftest import LOC_1, MATERIAL_A, MATERIAL_B
 
 MISSING_ID = "99999999-9999-9999-9999-999999999999"
@@ -11,15 +9,45 @@ def seed_match(db, status="pending"):
 
 
 class TestMatchingReview:
-    @pytest.mark.parametrize("action,expected", [("approve", "approved"), ("reject", "rejected")])
-    def test_review_updates_status_and_audits(self, client, db, action, expected):
+    """Approve/reject now goes through the approve_mapping RPC (plan step 1.2.3): reject just
+    closes the review, approve additionally merges stock into the survivor and deprecates the
+    duplicate, all in one transaction. The old optimistic compare-and-set is replaced by a real
+    row lock (FOR UPDATE) inside the RPC, which isn't something a single-threaded fake can
+    usefully simulate losing — the property it protects is covered by the 409 test below instead.
+    """
+
+    def test_reject_updates_status_and_audits_without_touching_the_materials(self, client, db):
         match = seed_match(db)
-        r = client.patch(f"/matching/{match['id']}/{action}")
-        assert r.status_code == 200 and r.json() == {"status": expected, "match_id": match["id"]}
+        r = client.patch(f"/matching/{match['id']}/reject")
+        assert r.status_code == 200 and r.json() == {"status": "rejected", "match_id": match["id"]}
         row = db.rows("matching_queue")[0]
-        assert row["status"] == expected and row["reviewed_by"] == "user-1" and row["reviewed_at"]
+        assert row["status"] == "rejected" and row["reviewed_by"] == "user-1" and row["reviewed_at"]
         audit = db.rows("audit_log")[0]
-        assert audit["action"] == f"mapping_{expected}" and audit["entity_id"] == match["id"]
+        assert audit["action"] == "mapping_rejected" and audit["entity_id"] == match["id"]
+        assert next(m for m in db.rows("materials") if m["id"] == MATERIAL_B)["status"] == "pending"
+
+    def test_approve_merges_stock_and_deprecates_the_duplicate(self, client, db):
+        db.seed("inventory", material_id=MATERIAL_B, location_code=LOC_1, quantity=10)
+        db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=5)
+        match = seed_match(db)
+
+        r = client.patch(f"/matching/{match['id']}/approve")
+        assert r.status_code == 200 and r.json() == {"status": "approved", "match_id": match["id"]}
+
+        row = db.rows("matching_queue")[0]
+        assert row["status"] == "approved" and row["reviewed_by"] == "user-1" and row["reviewed_at"]
+
+        duplicate = next(m for m in db.rows("materials") if m["id"] == MATERIAL_B)
+        assert duplicate["status"] == "deprecated" and duplicate["deprecated_by"] == "user-1"
+        survivor_cnmc = next(m for m in db.rows("materials") if m["id"] == MATERIAL_A)["cnmc"]
+        assert survivor_cnmc in duplicate["deprecation_reason"]
+
+        inv = db.rows("inventory")
+        assert [i["material_id"] for i in inv if i["location_code"] == LOC_1] == [MATERIAL_A]
+        assert next(i for i in inv if i["material_id"] == MATERIAL_A)["quantity"] == 15
+        assert [i for i in inv if i["material_id"] == MATERIAL_B] == []
+
+        assert [a["action"] for a in db.rows("audit_log")] == ["materials_merged", "mapping_approved"]
 
     def test_second_review_is_a_409_and_changes_nothing(self, client, db):
         match = seed_match(db)
@@ -27,13 +55,6 @@ class TestMatchingReview:
         r = client.patch(f"/matching/{match['id']}/reject")
         assert r.status_code == 409 and "already reviewed" in r.json()["detail"]
         assert db.rows("matching_queue")[0]["status"] == "approved"
-
-    def test_concurrent_review_loses_cleanly(self, client, db):
-        match = seed_match(db)
-        # someone else reviews between our status check and our update
-        db.before_update = lambda table, filters: db.rows("matching_queue")[0].update(status="rejected")
-        assert client.patch(f"/matching/{match['id']}/approve").status_code == 409
-        assert db.rows("matching_queue")[0]["status"] == "rejected"
 
     def test_missing_match_is_404_not_500(self, client):
         assert client.patch(f"/matching/{MISSING_ID}/approve").status_code == 404

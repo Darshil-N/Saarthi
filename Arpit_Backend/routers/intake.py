@@ -19,7 +19,6 @@ from models.intake import (
 )
 from services import receipt_service
 from services.ai_common import AIServiceError
-from services.audit_service import log_action
 from services.cnmc_service import generate_cnmc
 from services.matching_service import run_matching
 from services.ocr_service import (
@@ -62,35 +61,26 @@ async def _read_upload(file: UploadFile) -> tuple[bytes, str]:
     return data, content_type
 
 
-def _insert_pending_material(supabase: Client, material: dict) -> str | None:
-    """Insert a pending material, retrying with a numeric CNMC suffix on unique-key collisions."""
-    base_cnmc = material.get("cnmc")
-    for attempt in range(5):
-        try:
-            resp = supabase.table("materials").insert(material).execute()
-            return resp.data[0]["id"] if resp.data else None
-        except Exception as exc:
-            if base_cnmc and "materials_cnmc_key" in str(exc) and attempt < 4:
-                material["cnmc"] = f"{base_cnmc}-{attempt + 2}"
-                continue
-            logger.exception("Could not insert pending material %r", material.get("standard_description"))
-            return None
-    return None
-
-
 async def _build_line_item(supabase: Client, raw: dict, vendor_id: str | None, user: CurrentUser) -> LineItem:
     """Match one OCR line against the catalog and prepare its draft state.
 
+    Plan D-6 (decided 2026-09-22): this is read-only. No material, matching_queue or audit row is
+    written here — run_matching and generate_cnmc only read the database (candidate search,
+    CNMC-uniqueness check), so the operator gets the same preview as before, but nothing is
+    persisted until the receipt is confirmed (services/receipt_service.py, which sends this same
+    data to the confirm_receipt RPC — migrations/002_confirm_and_approve_rpcs.sql).
+
     Lines the AI is certain about (exact match, high confidence) link straight to the existing
-    material. Every other line gets a pending material (plus a review-queue entry when it resembles
-    an existing one) so stock can be booked against it and an approver can decide later.
+    material (material_id is set). Every other line carries the classification data needed to
+    create its own material at confirm time, plus the candidate it resembles (if any) so confirm
+    can queue it for review.
     """
     description = raw["description"]
     quantity = raw["quantity"]
     unit_price = raw["unit_price"]
 
     match = await run_matching(supabase, description, incoming_specs=raw)
-    matched_id = match["matched_material_id"]
+    candidate_id = match["matched_material_id"]
     candidate = match["master_candidate"]
 
     try:
@@ -98,13 +88,15 @@ async def _build_line_item(supabase: Client, raw: dict, vendor_id: str | None, u
     except ValueError:
         match_status = MatchStatus.uncertain
 
-    cnmc = match["cnmc"] if match["auto_link"] else None
-    pending_id: str | None = None
+    material_id: str | None = None
+    draft: dict = {}
 
-    if not match["auto_link"]:
+    if match["auto_link"]:
+        material_id = candidate_id
+        cnmc = match["cnmc"]
+    else:
         if candidate is None:
             cnmc_data = await generate_cnmc(supabase, description, str(raw), raw.get("quality_grade") or "")
-            generated = True
         else:
             # A near-duplicate or uncertain line mirrors the catalog entry it resembles.
             cnmc_data = {
@@ -118,46 +110,17 @@ async def _build_line_item(supabase: Client, raw: dict, vendor_id: str | None, u
                 "short_description": candidate.get("short_description"),
                 "technical_specs": candidate.get("technical_specs"),
             }
-            generated = False
 
-        pending_material = {
-            "cnmc": cnmc_data.get("cnmc"),
+        cnmc = cnmc_data.get("cnmc")
+        draft = {
             "category": cnmc_data.get("category") or "MISC",
             "subcategory": cnmc_data.get("subcategory") or "GEN",
             "material_type": cnmc_data.get("type") or "GEN",
             "spec": cnmc_data.get("spec"),
-            "quality_grade": cnmc_data.get("quality") if cnmc_data.get("quality") in ("A", "B", "C") else "A",
             "standard_description": cnmc_data.get("standard_description") or description,
             "short_description": cnmc_data.get("short_description"),
             "technical_specs": cnmc_data.get("technical_specs"),
-            "status": "pending",
-            "embedding": match["embedding"],
-            "created_by": user.id,
-            "unit_of_measure": raw["unit"],
         }
-        pending_id = await asyncio.to_thread(_insert_pending_material, supabase, pending_material)
-        cnmc = pending_material.get("cnmc")
-
-        if pending_id and generated:
-            await asyncio.to_thread(
-                log_action, supabase, user.id, user.role, "cnmc_generated", "materials", pending_id, None, {"cnmc": cnmc}
-            )
-
-        # matching_queue.matched_material_id is NOT NULL, so only lines that resemble something are queued.
-        if pending_id and matched_id:
-            queue_row = {
-                "new_material_id": pending_id,
-                "matched_material_id": matched_id,
-                "match_type": match["match_type"],
-                "confidence_score": match["confidence"],
-                "vector_similarity": match["vector_similarity"],
-                "match_reason": match["match_reason"],
-                "status": "pending",
-            }
-            try:
-                await asyncio.to_thread(lambda: supabase.table("matching_queue").insert(queue_row).execute())
-            except Exception:
-                logger.exception("Could not queue %s for review", pending_id)
 
     return LineItem(
         line_id=raw["line_id"],
@@ -169,16 +132,19 @@ async def _build_line_item(supabase: Client, raw: dict, vendor_id: str | None, u
         batch_number=raw.get("batch_number"),
         hsn_code=raw.get("hsn_code"),
         match_status=match_status,
-        matched_material_id=matched_id,
+        material_id=material_id,
+        is_new_material=material_id is None,
+        candidate_material_id=candidate_id,
         matched_description=match["matched_description"],
-        pending_material_id=pending_id,
+        match_type=match["match_type"],
         confidence=match["confidence"],
+        vector_similarity=match["vector_similarity"],
         match_reason=match["match_reason"],
         cnmc=cnmc,
-        is_new_material=match_status == MatchStatus.new_material,
         quality_grade=raw.get("quality_grade") or "A",
         quality_notes="",
         vendor_id=vendor_id,
+        **draft,
     )
 
 
@@ -332,10 +298,10 @@ def get_receipt(
 
 
 @router.post("/confirm", response_model=ConfirmResponse)
-def confirm_receipt(
+async def confirm_receipt(
     body: ConfirmRequest,
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(require_roles(*_ENTRY_ROLES)),
 ):
-    result = receipt_service.confirm_receipt(supabase, current_user, body)
+    result = await receipt_service.confirm_receipt(supabase, current_user, body)
     return ConfirmResponse(status="success", **result)

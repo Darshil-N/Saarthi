@@ -93,7 +93,7 @@ export default function BarcodeScanner() {
       unit_price: unitPrice,
       total_price: unitPrice * quantity,
       match_status: 'exact_match',
-      matched_material_id: foundItem.matched_material_id,
+      material_id: foundItem.matched_material_id,
       cnmc: foundItem.cnmc,
       is_new_material: false,
       confidence: 1,

@@ -4,7 +4,13 @@ It implements the query-builder calls the application uses (select / insert / up
 eq / neq / gte / lte / in_, order, limit, range, single / maybe_single, count="exact", JSON-path
 filters and PostgREST-style resource embedding) so business logic can be exercised without a
 database. It is NOT a faithful PostgREST: unsupported calls raise AttributeError on purpose.
+
+It also fakes the two database functions in migrations/002_confirm_and_approve_rpcs.sql
+(confirm_receipt, approve_mapping) as plain Python, since there is no real Postgres to run the
+SQL against in tests. Each is wrapped so that any exception restores a snapshot taken before it
+ran, the same all-or-nothing guarantee Postgres gives a real transaction for free.
 """
+import copy
 import itertools
 import re
 import uuid
@@ -23,6 +29,7 @@ RELATIONS = {
 UNIQUE = {
     "inventory": ("material_id", "location_code"),
     "materials": ("cnmc",),
+    "matching_queue": ("new_material_id", "matched_material_id"),
 }
 
 
@@ -75,6 +82,280 @@ class FakeSupabase:
 
     def table(self, name: str) -> "FakeQuery":
         return FakeQuery(self, name)
+
+    def rpc(self, name: str, params: dict | None = None) -> "FakeRpc":
+        return FakeRpc(self, name, params or {})
+
+    # -- fake database functions (migrations/002_confirm_and_approve_rpcs.sql) --------
+
+    def _run_atomically(self, fn, *args):
+        """Snapshot every table, run fn, and restore the snapshot if fn raises — the same
+        all-or-nothing guarantee a real Postgres transaction gives confirm_receipt/approve_mapping
+        for free."""
+        snapshot = copy.deepcopy(dict(self.tables))
+        try:
+            return fn(*args)
+        except Exception:
+            self.tables.clear()
+            self.tables.update(snapshot)
+            raise
+
+    @staticmethod
+    def _raise(message: str, code: str = "P0001"):
+        raise APIError({"message": message, "code": code, "details": "", "hint": None})
+
+    def _receipt_result(self, gr: dict, already_confirmed: bool) -> dict:
+        line_count = len([l for l in self.tables["gr_line_items"] if l.get("gr_id") == gr["id"]])
+        return {
+            "receipt_id": gr["id"], "gr_number": gr["gr_number"],
+            "total_value": gr.get("total_value"), "line_items_created": line_count,
+            "already_confirmed": already_confirmed,
+        }
+
+    def _confirm_receipt(self, payload: dict) -> dict:
+        def run():
+            received_by = payload.get("received_by")
+            client_draft_id = payload.get("client_draft_id") or None
+            line_items = payload.get("line_items") or []
+            if not received_by:
+                self._raise("VALIDATION: received_by is required")
+            if not line_items:
+                self._raise("VALIDATION: at least one line item is required")
+
+            if client_draft_id:
+                existing = next(
+                    (r for r in self.tables["goods_receipts"]
+                     if r.get("received_by") == received_by and r.get("client_draft_id") == client_draft_id),
+                    None,
+                )
+                if existing:
+                    return self._receipt_result(existing, already_confirmed=True)
+
+            total_value = round(sum(float(l["quantity"]) * float(l["unit_price"]) for l in line_items), 2)
+            gr = self.table("goods_receipts").insert({
+                "vendor_id": payload.get("vendor_id"),
+                "receipt_date": payload.get("receipt_date"),
+                "po_number": payload.get("po_number"),
+                "bill_image_url": payload.get("bill_image_path"),
+                "received_by": received_by,
+                "status": "completed",
+                "total_value": total_value,
+                "client_draft_id": client_draft_id,
+            }).execute().data[0]
+
+            for line in line_items:
+                material_id = line.get("material_id")
+                new_mat = line.get("new_material")
+
+                if not material_id and new_mat:
+                    cnmc = new_mat.get("cnmc")
+                    suffix = 1
+                    while True:
+                        try:
+                            mat = self.table("materials").insert({
+                                "cnmc": cnmc, "status": "pending",
+                                "category": new_mat.get("category") or "MISC",
+                                "subcategory": new_mat.get("subcategory") or "GEN",
+                                "material_type": new_mat.get("material_type") or "GEN",
+                                "spec": new_mat.get("spec"),
+                                "quality_grade": new_mat.get("quality_grade"),
+                                "standard_description": new_mat.get("standard_description") or line.get("raw_description"),
+                                "short_description": new_mat.get("short_description"),
+                                "technical_specs": new_mat.get("technical_specs"),
+                                "unit_of_measure": new_mat.get("unit_of_measure") or line.get("unit"),
+                                "embedding": new_mat.get("embedding"),
+                                "created_by": received_by,
+                            }).execute().data[0]
+                            material_id = mat["id"]
+                            break
+                        except APIError:
+                            suffix += 1
+                            cnmc = f"{new_mat.get('cnmc')}-{suffix}"
+
+                    self.table("audit_log").insert({
+                        "actor_id": received_by, "actor_role": payload.get("received_by_role"),
+                        "action": "cnmc_generated", "entity_type": "materials", "entity_id": material_id,
+                        "new_value": {"cnmc": cnmc},
+                    }).execute()
+
+                    cand = line.get("candidate_match")
+                    if cand and cand.get("matched_material_id"):
+                        try:
+                            self.table("matching_queue").insert({
+                                "new_material_id": material_id,
+                                "matched_material_id": cand["matched_material_id"],
+                                "match_type": cand.get("match_type"),
+                                "confidence_score": cand.get("confidence_score"),
+                                "vector_similarity": cand.get("vector_similarity"),
+                                "match_reason": cand.get("match_reason"),
+                                "status": "pending",
+                            }).execute()
+                        except APIError:
+                            pass  # ON CONFLICT (new_material_id, matched_material_id) DO NOTHING
+
+                if not material_id:
+                    self._raise("VALIDATION: a line item has neither material_id nor new_material data")
+
+                mat_row = next((m for m in self.tables["materials"] if m["id"] == material_id), None)
+                if not mat_row or mat_row.get("status") == "deprecated":
+                    self._raise("VALIDATION: the material for one of the line items no longer exists or has been deprecated")
+
+                line_row = self.table("gr_line_items").insert({
+                    "gr_id": gr["id"], "material_id": material_id,
+                    "quantity_received": line["quantity"], "unit_of_measure": line["unit"],
+                    "unit_price": line["unit_price"], "quality_grade": line.get("quality_grade"),
+                    "quality_notes": line.get("quality_notes"), "location_code": line.get("location_code"),
+                    "barcode": line.get("barcode"), "batch_number": line.get("batch_number"),
+                    "expiry_date": line.get("expiry_date"), "raw_description": line.get("raw_description"),
+                    "match_status": line.get("match_status"),
+                    "total_price": line["quantity"] * line["unit_price"],
+                }).execute().data[0]
+
+                existing_inv = next(
+                    (i for i in self.tables["inventory"]
+                     if i["material_id"] == material_id and i["location_code"] == line["location_code"]),
+                    None,
+                )
+                if existing_inv:
+                    existing_inv["quantity"] = existing_inv.get("quantity", 0) + line["quantity"]
+                else:
+                    self.table("inventory").insert({
+                        "material_id": material_id, "location_code": line["location_code"],
+                        "quantity": line["quantity"],
+                    }).execute()
+
+                if line["unit_price"] > 0:
+                    self.table("price_history").insert({
+                        "material_id": material_id, "vendor_id": payload.get("vendor_id"),
+                        "gr_line_item_id": line_row["id"], "unit_price": line["unit_price"],
+                        "quantity": line["quantity"], "purchase_date": payload.get("receipt_date"),
+                    }).execute()
+
+            self.table("audit_log").insert({
+                "actor_id": received_by, "actor_role": payload.get("received_by_role"),
+                "action": "receipt_confirmed", "entity_type": "goods_receipts", "entity_id": gr["id"],
+                "new_value": {"gr_number": gr["gr_number"]},
+            }).execute()
+
+            return self._receipt_result(gr, already_confirmed=False)
+
+        return self._run_atomically(run)
+
+    def _approve_mapping(self, params: dict) -> dict:
+        def run():
+            match_id = params.get("p_match_id")
+            reviewer_id = params.get("p_reviewer_id")
+            reviewer_role = params.get("p_reviewer_role")
+            action = params.get("p_action")
+            if action not in ("approve", "reject"):
+                self._raise("VALIDATION: action must be approve or reject")
+
+            match = next((m for m in self.tables["matching_queue"] if m["id"] == match_id), None)
+            if not match:
+                self._raise(f"NOT_FOUND: match {match_id} does not exist")
+            if match.get("status") != "pending":
+                self._raise(f"ALREADY_REVIEWED: this match was already reviewed (status: {match['status']})")
+
+            new_status = "approved" if action == "approve" else "rejected"
+            merged_qty, merged_bins = 0, 0
+
+            if action == "approve":
+                new_id, matched_id = match["new_material_id"], match["matched_material_id"]
+                for inv in [i for i in self.tables["inventory"] if i["material_id"] == new_id]:
+                    existing = next(
+                        (i for i in self.tables["inventory"]
+                         if i["material_id"] == matched_id and i["location_code"] == inv["location_code"]),
+                        None,
+                    )
+                    if existing:
+                        existing["quantity"] = existing.get("quantity", 0) + inv["quantity"]
+                    else:
+                        self.table("inventory").insert({
+                            "material_id": matched_id, "location_code": inv["location_code"],
+                            "quantity": inv["quantity"],
+                        }).execute()
+                    merged_qty += inv["quantity"]
+                    merged_bins += 1
+                self.tables["inventory"] = [i for i in self.tables["inventory"] if i["material_id"] != new_id]
+
+                for row in self.tables["gr_line_items"]:
+                    if row.get("material_id") == new_id:
+                        row["material_id"] = matched_id
+                for row in self.tables["price_history"]:
+                    if row.get("material_id") == new_id:
+                        row["material_id"] = matched_id
+
+                existing_pairs = {
+                    (r.get("source_system"), r.get("legacy_code"))
+                    for r in self.tables["material_code_mappings"] if r.get("material_id") == matched_id
+                }
+                keep = []
+                for row in self.tables["material_code_mappings"]:
+                    if row.get("material_id") == new_id:
+                        key = (row.get("source_system"), row.get("legacy_code"))
+                        if key in existing_pairs:
+                            continue  # duplicate of a mapping the survivor already has: dropped
+                        row["material_id"] = matched_id
+                        existing_pairs.add(key)
+                    keep.append(row)
+                self.tables["material_code_mappings"] = keep
+
+                mat = next((m for m in self.tables["materials"] if m["id"] == new_id), None)
+                survivor = next((m for m in self.tables["materials"] if m["id"] == matched_id), None)
+                if mat:
+                    mat["status"] = "deprecated"
+                    mat["deprecated_by"] = reviewer_id
+                    mat["deprecation_reason"] = (
+                        f"Merged into {(survivor or {}).get('cnmc', matched_id)} via mapping approval"
+                    )
+
+                self.table("audit_log").insert({
+                    "actor_id": reviewer_id, "actor_role": reviewer_role, "action": "materials_merged",
+                    "entity_type": "materials", "entity_id": new_id,
+                    "old_value": {"status": "pending"},
+                    "new_value": {"status": "deprecated", "merged_into": matched_id,
+                                  "inventory_bins_merged": merged_bins, "quantity_merged": merged_qty},
+                }).execute()
+
+            match["status"] = new_status
+            match["reviewed_by"] = reviewer_id
+            match["reviewed_at"] = f"2026-09-19T00:00:{next(self._clock):02d}+00:00"
+
+            self.table("audit_log").insert({
+                "actor_id": reviewer_id, "actor_role": reviewer_role,
+                "action": "mapping_approved" if action == "approve" else "mapping_rejected",
+                "entity_type": "matching_queue", "entity_id": match_id,
+                "old_value": {"status": "pending"}, "new_value": {"status": new_status},
+            }).execute()
+
+            return {"status": new_status, "match_id": match_id,
+                    "inventory_bins_merged": merged_bins, "quantity_merged": merged_qty}
+
+        return self._run_atomically(run)
+
+
+class FakeRpc:
+    """Fakes supabase.rpc(name, params).execute(). Only the two functions this project defines
+    (migrations/002_confirm_and_approve_rpcs.sql) are known; anything else raises AttributeError
+    on purpose, same as an unsupported FakeQuery call."""
+
+    _HANDLERS = {
+        "confirm_receipt": lambda db, params: db._confirm_receipt(params.get("p_payload") or {}),
+        "approve_mapping": lambda db, params: db._approve_mapping(params),
+    }
+
+    def __init__(self, db: FakeSupabase, name: str, params: dict):
+        self.db, self.name, self.params = db, name, params
+
+    def execute(self):
+        self.db.calls.append((self.name, "rpc"))
+        failure = self.db.failures.get((self.name, "rpc"))
+        if failure:
+            raise failure
+        handler = self._HANDLERS.get(self.name)
+        if handler is None:
+            raise AttributeError(f"FakeSupabase.rpc: no fake for {self.name!r}")
+        return SimpleNamespace(data=handler(self.db, self.params), count=None)
 
 
 class FakeQuery:

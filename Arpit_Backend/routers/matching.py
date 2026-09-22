@@ -1,11 +1,14 @@
-from datetime import datetime, timezone
+import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from postgrest.exceptions import APIError
 from supabase import Client
 
 from dependencies import CurrentUser, get_current_user, get_supabase, require_roles
-from services.audit_service import log_action
 from services.validators import require_uuid
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -28,50 +31,48 @@ def list_pending(
     return resp.data or []
 
 
-def _review(match_id: str, new_status: str, action: str, supabase: Client, user: CurrentUser) -> dict:
+async def _review(match_id: str, action: str, supabase: Client, user: CurrentUser) -> dict:
+    """Approve or reject a match via the approve_mapping RPC (plan step 1.2.3), which — for an
+    approval — merges stock, repoints purchase/price history, and deprecates the duplicate, all
+    in one transaction. FOR UPDATE inside the RPC is what actually prevents two reviewers from
+    both winning (the caller's job is just to turn the RPC's outcome into the right HTTP status).
+    """
     match_id = require_uuid(match_id, "Match")
-    row = supabase.table("matching_queue").select("id, status").eq("id", match_id).maybe_single().execute()
-    if not row or not row.data:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Match not found")
-    if row.data["status"] != "pending":
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            detail=f"This match was already reviewed (status: {row.data['status']})",
+    try:
+        resp = await asyncio.to_thread(
+            lambda: supabase.rpc("approve_mapping", {
+                "p_match_id": match_id,
+                "p_reviewer_id": user.id,
+                "p_reviewer_role": user.role,
+                "p_action": action,
+            }).execute()
         )
+    except APIError as exc:
+        msg = str(exc)
+        if "NOT_FOUND:" in msg:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Match not found")
+        if "ALREADY_REVIEWED:" in msg:
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="This match was already reviewed")
+        logger.exception("approve_mapping RPC failed for match %s (%s)", match_id, action)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not review this match. Please try again.")
 
-    # The status filter makes the update a compare-and-set: a concurrent reviewer cannot be overwritten.
-    updated = (
-        supabase.table("matching_queue")
-        .update({
-            "status": new_status,
-            "reviewed_by": user.id,
-            "reviewed_at": datetime.now(timezone.utc).isoformat(),
-        })
-        .eq("id", match_id)
-        .eq("status", "pending")
-        .execute()
-    )
-    if not updated.data:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="This match was just reviewed by someone else")
-
-    log_action(supabase, user.id, user.role, action, "matching_queue", match_id,
-               {"status": "pending"}, {"status": new_status})
-    return {"status": new_status, "match_id": match_id}
+    result = resp.data or {}
+    return {"status": result["status"], "match_id": result["match_id"]}
 
 
 @router.patch("/{match_id}/approve")
-def approve_match(
+async def approve_match(
     match_id: str,
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(require_roles(*_REVIEWERS)),
 ):
-    return _review(match_id, "approved", "mapping_approved", supabase, current_user)
+    return await _review(match_id, "approve", supabase, current_user)
 
 
 @router.patch("/{match_id}/reject")
-def reject_match(
+async def reject_match(
     match_id: str,
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(require_roles(*_REVIEWERS)),
 ):
-    return _review(match_id, "rejected", "mapping_rejected", supabase, current_user)
+    return await _review(match_id, "reject", supabase, current_user)

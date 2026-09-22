@@ -1,9 +1,6 @@
-from decimal import Decimal
-
 import pytest
 from postgrest.exceptions import APIError
 
-from services import receipt_service
 from tests.conftest import LOC_1, LOC_2, MATERIAL_A, MATERIAL_B, MATERIAL_DEPRECATED, VENDOR_ID, confirm_payload
 
 MISSING_ID = "99999999-9999-9999-9999-999999999999"
@@ -108,58 +105,66 @@ class TestConfirmValidation:
         assert client.post("/intake/confirm", json=confirm_payload(vendor_id="abc")).status_code == 422
 
     def test_line_without_material_link_is_rejected(self, client, db):
-        r = self._post(client, lambda b: b["line_items"][0].update(matched_material_id=None))
+        r = self._post(client, lambda b: b["line_items"][0].update(material_id=None))
         assert r.status_code == 422 and "Line 1" in r.json()["detail"] and "not linked" in r.json()["detail"]
         assert db.rows("goods_receipts") == []
 
     def test_deprecated_material_rejected(self, client):
-        r = self._post(client, lambda b: b["line_items"][0].update(matched_material_id=MATERIAL_DEPRECATED))
+        r = self._post(client, lambda b: b["line_items"][0].update(material_id=MATERIAL_DEPRECATED))
         assert r.status_code == 422 and "deprecated" in r.json()["detail"]
 
     def test_missing_material_rejected(self, client):
-        r = self._post(client, lambda b: b["line_items"][0].update(matched_material_id=MISSING_ID))
+        r = self._post(client, lambda b: b["line_items"][0].update(material_id=MISSING_ID))
         assert r.status_code == 422 and "no longer exists" in r.json()["detail"]
 
     def test_all_problems_reported_together(self, client):
         def mutate(b):
             b["line_items"][0]["location_code"] = "WHSE-Z"
-            b["line_items"][1].update(matched_material_id=None, pending_material_id=None)
+            b["line_items"][1].update(material_id=None)
 
         detail = self._post(client, mutate).json()["detail"]
         assert "WHSE-Z" in detail and "Line 2" in detail
 
 
 class TestConfirmIsAllOrNothing:
+    """confirm_receipt now does all its writes inside one database transaction
+    (migrations/002_confirm_and_approve_rpcs.sql, plan step 1.2.2) — any failure rolls back
+    everything it already wrote, with no manual undo logic on the Python side any more. The fake
+    RPC (tests/fake_supabase.py) gives the same guarantee by snapshotting every table first."""
+
     def test_failure_writing_price_history_undoes_everything(self, client, db):
         db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=1500)
-        db.fail("price_history", "insert")
+        db.fail("price_history", "insert", APIError({"message": "boom", "code": "XX000", "details": "", "hint": None}))
         r = client.post("/intake/confirm", json=confirm_payload())
         assert r.status_code == 500
-        assert "no changes were kept" in r.json()["detail"]
+        assert "saved" in r.json()["detail"].lower()
         assert db.rows("goods_receipts") == [] and db.rows("gr_line_items") == []
         assert stock(db, MATERIAL_A, LOC_1) == 1500            # restored
         assert stock(db, MATERIAL_B, LOC_2) is None            # the row we created is gone again
         assert db.rows("price_history") == [] and db.rows("audit_log") == []
 
     def test_failure_creating_line_items_removes_the_header(self, client, db):
-        db.fail("gr_line_items", "insert")
+        db.fail("gr_line_items", "insert", APIError({"message": "boom", "code": "XX000", "details": "", "hint": None}))
         assert client.post("/intake/confirm", json=confirm_payload()).status_code == 500
         assert db.rows("goods_receipts") == [] and db.rows("inventory") == []
 
-    def test_failure_in_stock_update_of_second_line_reverts_the_first(self, client, db, monkeypatch):
-        real = receipt_service.add_stock
-        seen = []
+    def test_failure_on_the_second_lines_stock_update_reverts_the_first(self, client, db, monkeypatch):
+        """A failure on the second line's inventory write must undo the first line's stock too —
+        proved by failing only the second `inventory` insert, mid-transaction."""
+        query_cls = type(db.table("inventory"))
+        real_execute = query_cls.execute
+        seen = {"inventory_inserts": 0}
 
-        def flaky(supabase, material_id, location_code, delta):
-            if delta > 0 and seen:
-                raise RuntimeError("boom on second line")
-            if delta > 0:
-                seen.append(material_id)
-            return real(supabase, material_id, location_code, delta)
+        def flaky_execute(self):
+            if self.name == "inventory" and self.op == "insert":
+                seen["inventory_inserts"] += 1
+                if seen["inventory_inserts"] == 2:
+                    raise APIError({"message": "boom on second line", "code": "XX000", "details": "", "hint": None})
+            return real_execute(self)
 
-        monkeypatch.setattr(receipt_service, "add_stock", flaky)
+        monkeypatch.setattr(query_cls, "execute", flaky_execute)
         assert client.post("/intake/confirm", json=confirm_payload()).status_code == 500
-        assert stock(db, MATERIAL_A, LOC_1) in (None, 0) and db.rows("goods_receipts") == []
+        assert stock(db, MATERIAL_A, LOC_1) is None and db.rows("goods_receipts") == []
 
 
 class TestIdempotency:
@@ -178,53 +183,6 @@ class TestIdempotency:
         client.post("/intake/confirm", json=confirm_payload(client_draft_id="draft-2"))
         assert len(db.rows("goods_receipts")) == 2
         assert stock(db, MATERIAL_A, LOC_1) == 200
-
-
-class TestAddStock:
-    def test_creates_row(self, db):
-        assert receipt_service.add_stock(db, MATERIAL_A, LOC_1, Decimal("5")) is True
-        assert stock(db, MATERIAL_A, LOC_1) == 5
-
-    def test_lost_race_is_retried_and_no_update_is_lost(self, db):
-        db.seed("inventory", id="inv-1", material_id=MATERIAL_A, location_code=LOC_1, quantity=100)
-        interfered = []
-
-        def concurrent_writer(table, filters):
-            if table == "inventory" and not interfered:      # another receipt lands between our read and write
-                interfered.append(1)
-                db.rows("inventory")[0]["quantity"] = 130
-
-        db.before_update = concurrent_writer
-        receipt_service.add_stock(db, MATERIAL_A, LOC_1, Decimal("10"))
-        assert stock(db, MATERIAL_A, LOC_1) == 140           # 130 + 10, not 100 + 10
-
-    def test_insert_race_falls_back_to_update(self, db, monkeypatch):
-        query_cls = type(db.table("inventory"))
-        real_insert = query_cls.insert
-        state = {"first": True}
-
-        def racing_insert(self, payload):
-            if self.name == "inventory" and state["first"]:
-                state["first"] = False
-                db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=7)  # the winner
-                raise APIError({"message": "duplicate", "code": "23505", "details": "", "hint": None})
-            return real_insert(self, payload)
-
-        monkeypatch.setattr(query_cls, "insert", racing_insert)
-        assert receipt_service.add_stock(db, MATERIAL_A, LOC_1, Decimal("3")) is False
-        assert stock(db, MATERIAL_A, LOC_1) == 10
-
-    def test_gives_up_after_repeated_conflicts(self, db):
-        db.seed("inventory", id="inv-1", material_id=MATERIAL_A, location_code=LOC_1, quantity=1)
-        row = db.rows("inventory")[0]
-        db.before_update = lambda table, filters: row.update(quantity=row["quantity"] + 1)
-        with pytest.raises(receipt_service.StockConflictError):
-            receipt_service.add_stock(db, MATERIAL_A, LOC_1, Decimal("1"))
-
-    def test_never_goes_negative(self, db):
-        db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=2)
-        receipt_service.add_stock(db, MATERIAL_A, LOC_1, Decimal("-5"))
-        assert stock(db, MATERIAL_A, LOC_1) == 0
 
 
 class TestReceiptReads:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,8 +15,20 @@ class MatchStatus(str, Enum):
 
 
 class LineItem(BaseModel):
-    """A line as returned by OCR / barcode lookup and edited in the UI. Deliberately lenient:
-    validation happens when the operator confirms the receipt (see ConfirmLineItem)."""
+    """A line as returned by OCR / barcode lookup and edited in the UI.
+
+    Plan D-6 (decided 2026-09-22): OCR is a read-only draft. Nothing here has been written to the
+    database yet — no material, no matching_queue row. Exactly two things distinguish how a line
+    is booked at confirm time:
+      * material_id set -> this line links to a material that already exists (an auto-linked exact
+        match, a barcode hit, or later an operator-picked one). No material is created for it.
+      * material_id unset -> this line needs a brand-new ('pending') material, using the
+        classification fields below, created as part of the same transaction that confirms the
+        receipt. candidate_material_id (if set) is only informational until confirm, where it
+        becomes a matching_queue row for review.
+    Deliberately lenient otherwise: validation happens when the operator confirms the receipt (see
+    ConfirmLineItem).
+    """
     line_id: str
     description: str
     quantity: float
@@ -26,14 +38,8 @@ class LineItem(BaseModel):
     batch_number: Optional[str] = None
     hsn_code: Optional[str] = None
     match_status: MatchStatus = MatchStatus.new_material
-    matched_material_id: Optional[str] = None
-    matched_description: Optional[str] = None
-    # Id of the pending material created for this line during OCR (None when the line was
-    # auto-linked to an existing material). Stock is booked against it on confirmation.
-    pending_material_id: Optional[str] = None
-    confidence: float = 0.0
-    match_reason: Optional[str] = None
-    cnmc: Optional[str] = None
+    # Set only when this line links directly to an existing material (see class docstring).
+    material_id: Optional[str] = None
     is_new_material: bool = True
     quality_grade: Optional[str] = ""
     quality_notes: Optional[str] = ""
@@ -41,6 +47,24 @@ class LineItem(BaseModel):
     vendor_id: Optional[str] = None
     barcode: Optional[str] = None
     expiry_date: Optional[date] = None
+
+    # -- candidate (informational until confirm; becomes a matching_queue row then) --
+    candidate_material_id: Optional[str] = None
+    matched_description: Optional[str] = None
+    match_type: Optional[str] = None
+    confidence: float = 0.0
+    vector_similarity: float = 0.0
+    match_reason: Optional[str] = None
+
+    # -- draft classification for a brand-new material (present when material_id is None) --
+    cnmc: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    material_type: Optional[str] = None
+    spec: Optional[str] = None
+    standard_description: Optional[str] = None
+    short_description: Optional[str] = None
+    technical_specs: Optional[dict[str, Any]] = None
 
 
 class OCRResponse(BaseModel):
@@ -55,8 +79,9 @@ class BarcodeRequest(BaseModel):
 
 
 class ConfirmLineItem(BaseModel):
-    """A line as accepted when confirming a receipt. Mirrors the database constraints so bad
-    input is rejected with a readable 422 instead of failing halfway through the write."""
+    """A line as accepted when confirming a receipt. Mirrors LineItem's fields (the UI forwards
+    whatever OCR/barcode returned, edited in place) plus the database constraints, so bad input is
+    rejected with a readable 422 instead of failing halfway through the write."""
     line_id: str
     description: str = Field(min_length=1, max_length=500)
     quantity: float = Field(gt=0, le=999_999_999)
@@ -65,13 +90,27 @@ class ConfirmLineItem(BaseModel):
     batch_number: Optional[str] = Field(default=None, max_length=100)
     hsn_code: Optional[str] = Field(default=None, max_length=50)
     match_status: MatchStatus = MatchStatus.new_material
-    matched_material_id: Optional[str] = None
-    pending_material_id: Optional[str] = None
+    material_id: Optional[str] = None
     quality_grade: Literal["A", "B", "C"]
     quality_notes: Optional[str] = Field(default=None, max_length=500)
     location_code: str = Field(min_length=1, max_length=100)
     barcode: Optional[str] = Field(default=None, max_length=128)
     expiry_date: Optional[date] = None
+
+    candidate_material_id: Optional[str] = None
+    match_type: Optional[str] = None
+    confidence: float = 0.0
+    vector_similarity: float = 0.0
+    match_reason: Optional[str] = None
+
+    cnmc: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    material_type: Optional[str] = None
+    spec: Optional[str] = None
+    standard_description: Optional[str] = None
+    short_description: Optional[str] = None
+    technical_specs: Optional[dict[str, Any]] = None
 
 
 class ConfirmRequest(BaseModel):

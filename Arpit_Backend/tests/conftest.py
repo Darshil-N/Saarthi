@@ -76,7 +76,9 @@ def client_as(db):
 
 
 def confirm_payload(**overrides) -> dict:
-    """A valid /intake/confirm body: one line for the catalog material, one for a pending material."""
+    """A valid /intake/confirm body: one line linking to the approved catalog material, one
+    linking to an existing pending material (e.g. a second delivery of something not yet
+    approved). Neither line creates a new material — see test_intake_ocr.py for that path."""
     body = {
         "vendor_id": VENDOR_ID,
         "receipt_date": "2026-09-19",
@@ -86,13 +88,12 @@ def confirm_payload(**overrides) -> dict:
             {
                 "line_id": "li_001", "description": "Hex bolt M8x25", "quantity": 100, "unit": "EA",
                 "unit_price": 12.5, "quality_grade": "A", "location_code": LOC_1,
-                "match_status": "exact_match", "matched_material_id": MATERIAL_A,
+                "match_status": "exact_match", "material_id": MATERIAL_A,
             },
             {
                 "line_id": "li_002", "description": "Hex bolt M8 x 25 stainless", "quantity": 40, "unit": "EA",
                 "unit_price": 11.8, "quality_grade": "B", "location_code": LOC_2,
-                "match_status": "near_duplicate", "matched_material_id": MATERIAL_A,
-                "pending_material_id": MATERIAL_B,
+                "match_status": "exact_match", "material_id": MATERIAL_B,
             },
         ],
     }
