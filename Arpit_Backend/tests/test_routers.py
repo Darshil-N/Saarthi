@@ -74,6 +74,25 @@ class TestMatchingReview:
         db.seed("v_matching_queue_detailed", status="approved", id="b")
         assert [r["id"] for r in client.get("/matching").json()] == ["a"]
 
+    def test_list_status_all_and_specific_status(self, client, db):
+        db.seed("v_matching_queue_detailed", status="pending", id="a")
+        db.seed("v_matching_queue_detailed", status="approved", id="b")
+        db.seed("v_matching_queue_detailed", status="rejected", id="c")
+        assert {r["id"] for r in client.get("/matching", params={"status": "all"}).json()} == {"a", "b", "c"}
+        assert [r["id"] for r in client.get("/matching", params={"status": "rejected"}).json()] == ["c"]
+
+    def test_list_unknown_status_is_422(self, client):
+        assert client.get("/matching", params={"status": "bogus"}).status_code == 422
+
+    def test_stats_counts_by_status(self, client, db):
+        db.seed("matching_queue", status="pending")
+        db.seed("matching_queue", status="pending")
+        db.seed("matching_queue", status="approved")
+        db.seed("matching_queue", status="auto_resolved")
+        assert client.get("/matching/stats").json() == {
+            "total": 4, "pending": 2, "approved": 1, "rejected": 0, "autoResolved": 1,
+        }
+
 
 class TestInventory:
     def test_missing_item_is_404_not_500(self, client):
@@ -150,6 +169,41 @@ class TestDashboard:
         db.fail("materials", "select")
         r = client.get("/dashboard/engineer")
         assert r.status_code == 502 and "dashboard" in r.json()["detail"].lower()
+
+    def test_admin_counts_quality_score_and_recent_materials(self, client, db):
+        db.seed("materials", status="approved", cnmc="X-1", standard_description="Has specs",
+                technical_specs={"a": 1})
+        db.seed("matching_queue", status="approved")  # counts as a duplicate even though resolved
+        db.seed("matching_queue", status="pending")
+
+        body = client.get("/dashboard/admin").json()
+        assert body["total"] == 4 and body["approved"] == 2 and body["pending"] == 1
+        assert body["duplicates"] == 2
+        assert body["qualityScore"] == 50   # 1 of 2 approved materials has technical_specs
+        assert len(body["recentMaterials"]) <= 5
+
+    def test_admin_database_failure_is_reported_not_shown_as_zeros(self, client, db):
+        db.fail("materials", "select")
+        r = client.get("/dashboard/admin")
+        assert r.status_code == 502 and "dashboard" in r.json()["detail"].lower()
+
+    def test_system_health_reports_real_counts_and_gemini_configured(self, client, db):
+        db.seed("goods_receipts", gr_number="GR-1")
+        db.seed("audit_log", action="x", entity_type="materials", entity_id=MATERIAL_A)
+
+        body = client.get("/dashboard/system-health").json()
+        assert body["dbConnected"] is True and isinstance(body["dbPingMs"], int)
+        assert body["geminiConfigured"] is True   # conftest sets a dummy GEMINI_API_KEY
+        assert body["counts"] == {
+            "materials": 3, "goodsReceipts": 1, "auditEntries": 1, "matchingQueue": 0, "nlQueries": 0,
+        }
+
+    def test_system_health_reports_db_down_instead_of_erroring(self, client, db):
+        db.fail("materials", "select")
+        r = client.get("/dashboard/system-health")
+        assert r.status_code == 200   # the health page must render even when the thing it checks is down
+        body = r.json()
+        assert body["dbConnected"] is False and body["counts"] is None
 
 
 class TestRequestContext:

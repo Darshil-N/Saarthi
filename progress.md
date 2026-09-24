@@ -1,7 +1,7 @@
 # Saarthi — Progress Tracker
 
 **Last updated:** 2026-09-22 — `approve_mapping` verified working live (merge/deprecate/audit) after a mistaken direct material approval was corrected; a full live OCR-to-confirm test was attempted but stopped for taking 8+ minutes (real finding for 3.2.1), so `confirm_receipt` is still unverified live
-**Overall:** 27 / 146 steps complete
+**Overall:** 29 / 146 steps complete
 **Status:** 🟡 In progress — no open decisions remain; Phase 1.1 access control is live and mostly confirmed; 1.2.3/approve_mapping has partial live proof; 1.2.2/confirm_receipt still needs a (short) live test
 
 ## How to use this file
@@ -23,7 +23,7 @@
 | 4 | Natural-Language Query (real Gemini) | 0 / 10 | ⚪ Not started |
 | 5 | Engineer Dashboard | 0 / 9 | ⚪ Not started |
 | 6 | Accounts Dashboard on Real Data | 0 / 14 | ⚪ Not started |
-| 7 | Admin Dashboard | 0 / 12 | ⚪ Not started |
+| 7 | Admin Dashboard | 2 / 12 | 🟡 In progress |
 | 8 | One Consistent Dataset | 0 / 11 | ⚪ Not started |
 | 9 | Frontend Structure, Session & Quality | 0 / 11 | ⚪ Not started |
 | 10 | Verification & Deployment | 0 / 8 | ⚪ Not started |
@@ -250,7 +250,7 @@
 ---
 
 # Phase 7 — Admin Dashboard
-**Steps complete:** 0 / 12
+**Steps complete:** 2 / 12
 
 ## Part 7.1 — Material governance  (0 / 3)
 
@@ -267,13 +267,13 @@
 | 7.2.1 | Audit query endpoint (paginated; filters: actor, action, entity, date range) | [ ] | M2, M7, B8 |  |  |
 | 7.2.2 | Audit UI: correct columns, action/entity values from the data, date filter, actor names, escaped CSV | [ ] | M2, M7 |  |  |
 
-## Part 7.3 — Duplicate detection  (0 / 3)
+## Part 7.3 — Duplicate detection  (2 / 3)
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 7.3.1 | Matching stats endpoint and queue listing with correct columns/statuses | [ ] | M1, B8 |  |  |
-| 7.3.2 | Merge / reject actions via the approve_mapping RPC with audit | [ ] | M1 |  |  |
-| 7.3.3 | Duplicate detection UI rewired to the new endpoints | [ ] | M1 |  |  |
+| 7.3.1 | Matching stats endpoint and queue listing with correct columns/statuses | [x] | M1, B8 |  | `GET /matching/stats` (counts by real status: pending/approved/rejected/auto_resolved) and `GET /matching?status=` (all / a specific status; still defaults to pending for the existing Pending Approvals screen) added 2026-09-24. Unit-tested and verified live with real data (9 matches: 1 pending, 7 approved, 1 rejected). |
+| 7.3.2 | Merge / reject actions via the approve_mapping RPC with audit | [x] | M1 |  | Already built in the D-6 rewiring (1.2.3/3.3.6) and live-verified twice this session: once correcting a mistaken direct material approval (merge, deprecate, audit all confirmed correct on real data), once via the pytest suite's merge scenario. |
+| 7.3.3 | Duplicate detection UI rewired to the new endpoints | [~] | M1 |  | `DuplicateDetection.jsx` rewritten 2026-09-24 — it was built against columns and statuses (`incoming_material_id`, `similarity_score`, `pending_review`, `'merged'`) that never existed in the real schema, so it never worked, independent of anything else. Now uses `/matching/stats`, `/matching?status=`, and the real approve/reject endpoints with real column names and statuses. Frontend build succeeds; not yet browser-verified. |
 
 ## Part 7.4 — Users and system health  (0 / 4)
 
@@ -281,8 +281,8 @@
 |---|---|---|---|---|---|
 | 7.4.1 | Admin-only create-user endpoint (auth user + profile) and role change with audit | [ ] | M3, B8 |  |  |
 | 7.4.2 | User list with correct columns; prevent self-deactivation; enforce is_active | [ ] | M3, B4 |  |  |
-| 7.4.3 | System health: real DB, Gemini/Ollama status, recent errors, table sizes | [ ] | M6 |  |  |
-| 7.4.4 | Admin Home KPIs computed correctly (duplicates, data quality) | [ ] | M5 |  |  |
+| 7.4.3 | System health: real DB, Gemini/Ollama status, recent errors, table sizes | [~] | M6 |  | `GET /dashboard/system-health` added 2026-09-24: real DB connectivity + ping time (measured server-side, reports `dbConnected: false` with a 200 rather than erroring, so the page still renders during an outage), real Gemini API key presence, real row counts (materials/goods_receipts/audit_log/matching_queue/nl_query_log). `SystemHealth.jsx` rewired to use it. Not done: Ollama status (Ollama isn't wired into the app at all yet — Phase 4), recent errors list, table sizes (bytes on disk). Verified live (dbPingMs 63, all counts real). |
+| 7.4.4 | Admin Home KPIs computed correctly (duplicates, data quality) | [~] | M5 |  | `GET /dashboard/admin` added 2026-09-24: material counts by status, duplicates (all-time matching_queue row count), data-quality score (% of approved materials with non-empty technical_specs, sampled up to 500), 5 most recent materials. `AdminHome.jsx` rewired to use it instead of querying Supabase directly. Unit-tested; verified live (30 materials, 20 approved, 6 pending, 9 duplicates, 100% quality score on real data). Not yet browser-verified. |
 
 ---
 
@@ -410,12 +410,12 @@ A finding is **Closed** only when every step that references it is `[x]` and the
 | C1 | 1.2.5, 6.1.1, 6.1.2, 6.1.3, 6.1.4, 6.1.5, 6.1.6, 6.1.7, 6.2.1, 6.2.2, 6.2.3, 6.2.4, 6.2.5, 6.2.7 | Open |
 | C2 | 6.2.3, 6.2.6 | Open |
 | C3 | 1.2.5, 6.1.4 | Open |
-| M1 | 7.3.1, 7.3.2, 7.3.3 | Open |
+| M1 | 7.3.1, 7.3.2, 7.3.3 | In progress |
 | M2 | 7.2.1, 7.2.2 | Open |
 | M3 | 7.4.1, 7.4.2 | Open |
 | M4 | 7.1.1, 7.1.2, 7.1.3, 9.2.5 | Open |
-| M5 | 1.2.6, 7.4.4 | Open |
-| M6 | 1.2.6, 7.4.3 | Open |
+| M5 | 1.2.6, 7.4.4 | In progress |
+| M6 | 1.2.6, 7.4.3 | In progress |
 | M7 | 7.2.1, 7.2.2 | Open |
 | D1 | 0.3.2, 1.1.1, 1.1.2 | Open |
 | D2 | 0.3.1, 1.1.3 | Open |
@@ -511,3 +511,11 @@ Known gaps you may notice: unknown barcodes cannot create new materials yet (3.4
   - **Still broken, not yet fixed** (same root cause, same fix pattern needed): `AdminHome.jsx` (7.4.4), `SystemHealth.jsx` (7.4.3), `DuplicateDetection.jsx` (7.3.3), `NLQuery.jsx` (Phase 4 — this one also needs the real NL→SQL service, not yet built at all). `AccountsHome.jsx` (6.2.1) needs the mock-data replacement it always needed, unrelated to this regression.
   - Lost significant time to two environment issues while testing this: `uvicorn --reload` detected the file change but kept serving the old route (404 on the new endpoint) until the process was killed and restarted fresh; and several zombie `vite` processes had accumulated across this session's repeated restarts, each landing on a new port (5173→5174→5175→5176) — cleaned up, now a single instance back on 5173. Separately, `curl http://127.0.0.1:5173` failed while the frontend was actually fine — `vite` binds to the IPv6 loopback (`[::1]`) on this machine, not `127.0.0.1`; `http://localhost:5173` (or a real browser) works.
   - 142 backend tests pass (2 new for `/dashboard/engineer`); frontend production build succeeds; `/dashboard/engineer` verified live via curl with real data (30 materials, 20 approved, 6 pending, 14 inventory locations, empty low-stock list — genuinely nothing is below reorder level right now). Not yet verified in an actual browser render.
+
+- Same day, asked to fix Admin Home, System Health and Duplicate Detection the same way. Read all three files first rather than guessing scope:
+  - `AdminHome.jsx` and `SystemHealth.jsx` were straightforward — same shape of problem as Engineer Home (direct Supabase reads, broken by migration 001). Added `GET /dashboard/admin` and `GET /dashboard/system-health`, rewired both pages to call them.
+  - `DuplicateDetection.jsx` turned out to be a different, older problem: it used columns and status values (`incoming_material_id`, `similarity_score`, `pending_review`, `'merged'`) that never existed in the real schema (confirmed against `schema.sql`) — it never worked, independent of migration 001. Rewrote it against the real schema and the already-working, already-live-verified `/matching` and `/matching/{id}/approve|reject` endpoints; extended `/matching` with an optional `status` filter (`all` or a specific one, still defaulting to pending so the existing Pending Approvals screen is untouched) and added `GET /matching/stats`.
+  - 7 new backend tests added (149 total, all pass). Frontend build succeeds. All four endpoints verified live with real data as the admin user: `/dashboard/admin` (30 materials, 9 duplicates, 100% quality score), `/dashboard/system-health` (dbPingMs 63, Gemini key configured, real counts), `/matching/stats` (9 total: 1 pending, 7 approved, 1 rejected), `/matching?status=all` (all 9 rows with correct real columns).
+  - Environment note: `uvicorn --reload` silently served stale routes again after this edit (same issue as with the Engineer fix) — killed and restarted fresh each time rather than trusting the watcher.
+  - Left out of this round, by original scope: `NLQuery.jsx` (also direct-Supabase, but needs the real Phase 4 NL→SQL service, not just a CRUD-style endpoint) and `AccountsHome.jsx` (pre-existing `mockAccountsData.js` issue, step 6.2.6).
+  - None of this has been browser-verified yet — only live API calls. A real click-through (including the Merge/Reject buttons in Duplicate Detection) is the next useful check.

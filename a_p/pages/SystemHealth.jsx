@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Database, Cpu, AlertCircle, CheckCircle2, RefreshCw, Clock, Zap } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
 const HealthCard = ({ title, value, unit, status, icon: Icon, description }) => {
   const statusColors = {
@@ -45,31 +45,24 @@ export default function SystemHealth() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dbPing, setDbPing] = useState(null);
+  const [dbConnected, setDbConnected] = useState(null);
+  const [geminiConfigured, setGeminiConfigured] = useState(null);
   const [lastChecked, setLastChecked] = useState(null);
 
   const fetchHealth = async () => {
     setLoading(true);
-    const start = Date.now();
     try {
-      const [matRes, grRes, auditRes, queueRes, nlRes] = await Promise.all([
-        supabase.from('materials').select('id', { count: 'exact', head: true }),
-        supabase.from('goods_receipts').select('id', { count: 'exact', head: true }),
-        supabase.from('audit_log').select('id', { count: 'exact', head: true }),
-        supabase.from('matching_queue').select('id', { count: 'exact', head: true }),
-        supabase.from('nl_query_log').select('id', { count: 'exact', head: true }),
-      ]);
-      const elapsed = Date.now() - start;
-      setDbPing(elapsed);
-      setStats({
-        materials: matRes.count || 0,
-        goodsReceipts: grRes.count || 0,
-        auditEntries: auditRes.count || 0,
-        matchingQueue: queueRes.count || 0,
-        nlQueries: nlRes.count || 0,
-      });
+      // /dashboard/system-health reports dbConnected: false with a 200 rather than erroring, so
+      // even a database outage renders on this page instead of showing a generic error state.
+      const { data } = await api.get('/dashboard/system-health');
+      setDbPing(data.dbPingMs);
+      setDbConnected(data.dbConnected);
+      setGeminiConfigured(data.geminiConfigured);
+      setStats(data.counts);
       setLastChecked(new Date());
     } catch (err) {
       console.error('Error fetching system health:', err);
+      setDbConnected(false);
     } finally {
       setLoading(false);
     }
@@ -113,17 +106,17 @@ export default function SystemHealth() {
           />
           <HealthCard
             title="Supabase Connection"
-            value={loading ? '…' : dbPing ? 'Connected' : 'Error'}
-            status={loading ? 'info' : dbPing ? 'good' : 'critical'}
+            value={loading ? '…' : dbConnected ? 'Connected' : 'Error'}
+            status={loading ? 'info' : dbConnected ? 'good' : 'critical'}
             icon={CheckCircle2}
-            description="PostgREST API reachable"
+            description="Backend to database, via the service role"
           />
           <HealthCard
-            title="pgvector Extension"
-            value="Active"
-            status="good"
+            title="Gemini API Key"
+            value={loading ? '…' : geminiConfigured ? 'Configured' : 'Missing'}
+            status={loading ? 'info' : geminiConfigured ? 'good' : 'critical'}
             icon={Cpu}
-            description="768-dim embeddings enabled"
+            description="Checked at startup, not called live on this page"
           />
         </div>
       </div>
@@ -188,9 +181,9 @@ export default function SystemHealth() {
         <div>
           <p className="text-sm font-semibold text-amber-800">Gemini API Usage</p>
           <p className="text-sm text-amber-700 mt-1">
-            Token usage and per-model analytics require a backend service endpoint. Connect your FastAPI backend at 
-            <code className="mx-1 px-1.5 py-0.5 bg-amber-100 rounded text-xs">/dashboard/admin</code>
-            to see real-time Gemini usage metrics here.
+            The API key's presence is checked above. Per-request token usage and per-model analytics
+            aren't tracked anywhere in the app yet — that would need its own logging, not just a
+            dashboard query.
           </p>
         </div>
       </div>

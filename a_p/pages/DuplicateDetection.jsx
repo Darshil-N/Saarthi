@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Copy, CheckCircle, XCircle, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
-const QUEUE_STATUSES = ['all', 'pending_review', 'auto_resolved', 'rejected', 'merged'];
+// Real matching_queue.status values (schema.sql) — this page previously used
+// 'pending_review' / 'merged', which never existed; 'approved' is what the backend calls a
+// merge, since that is what approving a match actually does (services/receipt confirm ->
+// approve_mapping RPC).
+const QUEUE_STATUSES = ['all', 'pending', 'approved', 'rejected', 'auto_resolved'];
 
 const StatusBadge = ({ status }) => {
   const styles = {
-    pending_review: 'bg-amber-100 text-amber-700',
+    pending: 'bg-amber-100 text-amber-700',
     auto_resolved: 'bg-emerald-100 text-emerald-700',
     rejected: 'bg-rose-100 text-rose-700',
-    merged: 'bg-indigo-100 text-indigo-700',
+    approved: 'bg-indigo-100 text-indigo-700',
   };
   return (
     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${styles[status] || 'bg-slate-100 text-slate-500'}`}>
@@ -33,9 +37,9 @@ const ScoreBar = ({ score }) => {
 
 export default function DuplicateDetection() {
   const [queue, setQueue] = useState([]);
-  const [stats, setStats] = useState({ total: 0, pending: 0, autoResolved: 0, rejected: 0 });
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, autoResolved: 0 });
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('pending_review');
+  const [statusFilter, setStatusFilter] = useState('pending');
   const [actionLoading, setActionLoading] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -44,59 +48,33 @@ export default function DuplicateDetection() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchQueue = async () => {
+  const fetchQueue = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch stats
-      const [totalRes, pendingRes, autoRes, rejectedRes] = await Promise.all([
-        supabase.from('matching_queue').select('id', { count: 'exact', head: true }),
-        supabase.from('matching_queue').select('id', { count: 'exact', head: true }).eq('status', 'pending_review'),
-        supabase.from('matching_queue').select('id', { count: 'exact', head: true }).eq('status', 'auto_resolved'),
-        supabase.from('matching_queue').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
+      const [statsRes, queueRes] = await Promise.all([
+        api.get('/matching/stats'),
+        api.get('/matching', { params: { status: statusFilter } }),
       ]);
-      setStats({
-        total: totalRes.count || 0,
-        pending: pendingRes.count || 0,
-        autoResolved: autoRes.count || 0,
-        rejected: rejectedRes.count || 0,
-      });
-
-      // Fetch queue items with material details
-      let query = supabase
-        .from('matching_queue')
-        .select(`
-          id, status, similarity_score, match_type, reviewed_by, reviewed_at, created_at,
-          incoming_material_id,
-          matched_material_id
-        `)
-        .order('similarity_score', { ascending: false })
-        .limit(50);
-      if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setQueue(data || []);
+      setStats(statsRes.data);
+      setQueue(queueRes.data || []);
     } catch (err) {
       console.error('Error fetching duplicate queue:', err);
+      showToast(err.response?.data?.detail || 'Could not load the matching queue', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { fetchQueue(); }, [statusFilter]);
+  useEffect(() => { fetchQueue(); }, [fetchQueue]);
 
-  const resolveItem = async (id, newStatus) => {
+  const resolveItem = async (id, action) => {
     setActionLoading(id);
     try {
-      const { error } = await supabase
-        .from('matching_queue')
-        .update({ status: newStatus, reviewed_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) throw error;
-      showToast(`Marked as ${newStatus.replace('_', ' ')}`);
+      const { data } = await api.patch(`/matching/${id}/${action}`);
+      showToast(action === 'approve' ? 'Merged — stock combined, duplicate deprecated' : 'Marked as a different material');
       fetchQueue();
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(err.response?.data?.detail || `Could not ${action} this match`, 'error');
     } finally {
       setActionLoading(null);
     }
@@ -160,9 +138,9 @@ export default function DuplicateDetection() {
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
               <tr>
                 <th className="px-5 py-3">Match Type</th>
-                <th className="px-5 py-3">Incoming Material ID</th>
-                <th className="px-5 py-3">Matched Material ID</th>
-                <th className="px-5 py-3">Similarity</th>
+                <th className="px-5 py-3">New Material</th>
+                <th className="px-5 py-3">Matches (existing)</th>
+                <th className="px-5 py-3">Confidence</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Created</th>
                 <th className="px-5 py-3">Actions</th>
@@ -197,39 +175,45 @@ export default function DuplicateDetection() {
                       {item.match_type || 'unknown'}
                     </span>
                   </td>
-                  <td className="px-5 py-4 font-mono text-xs text-slate-500">
-                    {item.incoming_material_id?.substring(0, 8)}…
+                  <td className="px-5 py-4 max-w-xs">
+                    <p className="font-medium text-slate-800 truncate">{item.new_description}</p>
+                    <p className="font-mono text-xs text-slate-400">{item.new_cnmc}</p>
                   </td>
-                  <td className="px-5 py-4 font-mono text-xs text-slate-500">
-                    {item.matched_material_id?.substring(0, 8)}…
+                  <td className="px-5 py-4 max-w-xs">
+                    <p className="font-medium text-slate-800 truncate">{item.matched_description}</p>
+                    <p className="font-mono text-xs text-slate-400">{item.matched_cnmc}</p>
                   </td>
                   <td className="px-5 py-4 w-40">
-                    <ScoreBar score={item.similarity_score} />
+                    <ScoreBar score={item.confidence_score} />
                   </td>
                   <td className="px-5 py-4"><StatusBadge status={item.status} /></td>
                   <td className="px-5 py-4 text-xs text-slate-400">
                     {item.created_at ? new Date(item.created_at).toLocaleDateString('en-IN') : '—'}
                   </td>
                   <td className="px-5 py-4">
-                    {item.status === 'pending_review' ? (
+                    {item.status === 'pending' ? (
                       <div className="flex gap-2">
                         <button
                           disabled={actionLoading === item.id}
-                          onClick={() => resolveItem(item.id, 'merged')}
+                          onClick={() => resolveItem(item.id, 'approve')}
                           className="text-xs font-medium px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 disabled:opacity-50"
+                          title="Confirm these are the same material: merges stock and deprecates the duplicate"
                         >
                           Merge
                         </button>
                         <button
                           disabled={actionLoading === item.id}
-                          onClick={() => resolveItem(item.id, 'rejected')}
+                          onClick={() => resolveItem(item.id, 'reject')}
                           className="text-xs font-medium px-2 py-1 bg-rose-100 text-rose-700 rounded-md hover:bg-rose-200 disabled:opacity-50"
+                          title="These are different materials — leave both as they are"
                         >
                           Reject
                         </button>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-300">—</span>
+                      <span className="text-xs text-slate-300">
+                        {item.reviewer_name ? `by ${item.reviewer_name}` : '—'}
+                      </span>
                     )}
                   </td>
                 </tr>

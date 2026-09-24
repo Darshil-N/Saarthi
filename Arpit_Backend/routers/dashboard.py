@@ -1,8 +1,10 @@
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
+from config import settings
 from dependencies import CurrentUser, get_current_user, get_supabase
 from services.time_utils import business_day_start_utc
 
@@ -106,3 +108,87 @@ def engineer_dashboard_stats(
     except Exception:
         logger.exception("Could not load engineer dashboard statistics")
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Could not load dashboard statistics")
+
+
+@router.get("/admin")
+def admin_dashboard_stats(
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Summary stats for the Admin home dashboard (plan step 7.4.4):
+    - total / approved / pending: material counts by status
+    - duplicates: all-time matching_queue row count (every match ever detected, not just pending)
+    - qualityScore: % of approved materials (sampled up to 500) with a non-empty technical_specs
+    - recentMaterials: 5 most recently added materials, any status
+    """
+    try:
+        specs_sample = (
+            supabase.table("materials").select("technical_specs").eq("status", "approved").limit(500).execute()
+        ).data or []
+        with_specs = sum(1 for m in specs_sample if m.get("technical_specs"))
+        quality_score = round((with_specs / len(specs_sample)) * 100) if specs_sample else 0
+
+        recent = (
+            supabase.table("materials")
+            .select("id, cnmc, standard_description, status, created_at")
+            .order("created_at", desc=True)
+            .limit(5)
+            .execute()
+        ).data or []
+
+        return {
+            "total": _count(supabase.table("materials").select("id", count="exact").limit(1)),
+            "approved": _count(
+                supabase.table("materials").select("id", count="exact").eq("status", "approved").limit(1)
+            ),
+            "pending": _count(
+                supabase.table("materials").select("id", count="exact").eq("status", "pending").limit(1)
+            ),
+            "duplicates": _count(supabase.table("matching_queue").select("id", count="exact").limit(1)),
+            "qualityScore": quality_score,
+            "recentMaterials": recent,
+        }
+    except Exception:
+        logger.exception("Could not load admin dashboard statistics")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Could not load dashboard statistics")
+
+
+@router.get("/system-health")
+def system_health_stats(
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Real system health for the Admin System Health screen (plan step 7.4.3).
+    Unlike the other dashboard endpoints, a database failure here is reported as data
+    (dbConnected: false) rather than a 502 — the whole point of a health screen is to show what's
+    actually broken, not to itself error out when the thing it is checking is down.
+    geminiConfigured only checks that an API key is set; it does not make a live Gemini call on
+    every page load, since that would be slow (per the free-tier latency already observed live)
+    and would burn quota for no real benefit on a page that just wants a status light.
+    """
+    start = time.monotonic()
+    try:
+        materials = _count(supabase.table("materials").select("id", count="exact").limit(1))
+        db_ping_ms = round((time.monotonic() - start) * 1000)
+        return {
+            "dbConnected": True,
+            "dbPingMs": db_ping_ms,
+            "geminiConfigured": bool(settings.GEMINI_API_KEY),
+            "counts": {
+                "materials": materials,
+                "goodsReceipts": _count(supabase.table("goods_receipts").select("id", count="exact").limit(1)),
+                "auditEntries": _count(supabase.table("audit_log").select("id", count="exact").limit(1)),
+                "matchingQueue": _count(supabase.table("matching_queue").select("id", count="exact").limit(1)),
+                "nlQueries": _count(supabase.table("nl_query_log").select("id", count="exact").limit(1)),
+            },
+        }
+    except Exception:
+        logger.exception("System health check found the database unreachable")
+        return {
+            "dbConnected": False,
+            "dbPingMs": None,
+            "geminiConfigured": bool(settings.GEMINI_API_KEY),
+            "counts": None,
+        }

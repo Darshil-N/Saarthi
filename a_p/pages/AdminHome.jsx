@@ -4,7 +4,7 @@ import {
   Database, CheckCircle2, Clock, Copy, BarChart2,
   ArrowRight, AlertTriangle, Shield, Users
 } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
 const StatusBadge = ({ status }) => {
   const colors = {
@@ -48,50 +48,24 @@ export default function AdminHome() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchStats() {
+    async function fetchAll() {
       try {
-        const [totalRes, approvedRes, pendingRes, dupRes, allMatRes] = await Promise.all([
-          supabase.from('materials').select('id', { count: 'exact', head: true }),
-          supabase.from('materials').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
-          supabase.from('materials').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('matching_queue').select('id', { count: 'exact', head: true }),
-          supabase.from('materials').select('technical_specs').eq('status', 'approved').limit(500),
-        ]);
-
-        const approved = approvedRes.count || 0;
-        const total = totalRes.count || 0;
-
-        // Data quality: % of approved materials with non-null technical_specs
-        const specsData = allMatRes.data || [];
-        const withSpecs = specsData.filter(m => m.technical_specs && Object.keys(m.technical_specs).length > 0).length;
-        const qualityScore = specsData.length > 0 ? Math.round((withSpecs / specsData.length) * 100) : 0;
-
+        const { data } = await api.get('/dashboard/admin');
         setStats({
-          total,
-          approved,
-          pending: pendingRes.count || 0,
-          duplicates: dupRes.count || 0,
-          qualityScore,
+          total: data.total,
+          approved: data.approved,
+          pending: data.pending,
+          duplicates: data.duplicates,
+          qualityScore: data.qualityScore,
         });
+        setRecentMaterials(data.recentMaterials || []);
       } catch (err) {
-        console.error('Failed to fetch admin stats:', err);
+        console.error('Failed to fetch admin dashboard stats:', err);
+      } finally {
+        setLoading(false);
       }
     }
-
-    async function fetchRecentMaterials() {
-      try {
-        const { data } = await supabase
-          .from('materials')
-          .select('id, cnmc, standard_description, status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        setRecentMaterials(data || []);
-      } catch (err) {
-        console.error('Failed to fetch recent materials:', err);
-      }
-    }
-
-    Promise.all([fetchStats(), fetchRecentMaterials()]).finally(() => setLoading(false));
+    fetchAll();
   }, []);
 
   return (
