@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     MATCH_CANDIDATE_THRESHOLD: float = 0.70
     MATCH_CANDIDATE_COUNT: int = 5
 
+    # --- Matching concurrency (plan step 3.2.1) ---
+    # How many bill lines are matched against the catalog at once during OCR review. Each line
+    # makes 1-3 Gemini calls (embedding, comparison verdict, maybe CNMC generation), so this is a
+    # deliberate middle ground: 1 (the old behaviour) is safest against free-tier rate limits but
+    # painfully slow for a multi-line bill; fully unbounded risks 429s on a big bill. Raise this
+    # if quota allows and it's still too slow; lower it if bills start failing with 429s.
+    MATCHING_CONCURRENCY: int = 3
+
     # --- Uploads ---
     MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # matches the bill-images bucket limit
     SIGNED_URL_TTL_SECONDS: int = 3600

@@ -171,9 +171,19 @@ async def intake_ocr(
 
     bill_path = await upload_bill_to_storage(supabase, file_bytes, content_type)
 
-    # Lines are processed one at a time on purpose: it keeps bursts of Gemini calls within
-    # the free-tier rate limit.
-    line_items = [await _build_line_item(supabase, raw, vendor_id, current_user) for raw in raw_items]
+    # Plan step 3.2.1 (2026-09-24): lines used to be matched one at a time, which made a 5-line
+    # bill take 6-8+ minutes end to end and looked broken to the operator even though it was
+    # working. Now up to MATCHING_CONCURRENCY lines are matched at once — order in the response
+    # still matches the bill (asyncio.gather preserves input order regardless of completion
+    # order), and the semaphore keeps bursts of Gemini calls bounded rather than firing every
+    # line's calls simultaneously, which risked 429s on a bill with many lines.
+    semaphore = asyncio.Semaphore(settings.MATCHING_CONCURRENCY)
+
+    async def _build_line_item_bounded(raw: dict) -> LineItem:
+        async with semaphore:
+            return await _build_line_item(supabase, raw, vendor_id, current_user)
+
+    line_items = await asyncio.gather(*(_build_line_item_bounded(raw) for raw in raw_items))
 
     return OCRResponse(
         receipt_id=f"draft-{uuid.uuid4()}",

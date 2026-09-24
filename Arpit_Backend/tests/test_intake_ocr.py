@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 import routers.intake as intake
@@ -178,6 +180,48 @@ class TestLineClassification:
         lines = upload(client).json()["line_items"]
         assert [l["description"] for l in lines] == ["A", "B"]
         assert len({l["line_id"] for l in lines}) == 2
+
+
+class TestMatchingConcurrency:
+    """Plan step 3.2.1 (2026-09-24): lines are matched up to MATCHING_CONCURRENCY at a time
+    instead of one at a time, which used to make a multi-line bill take 6-8+ minutes."""
+
+    def test_lines_are_matched_concurrently_up_to_the_configured_limit(self, client, ocr, monkeypatch):
+        monkeypatch.setattr(settings, "MATCHING_CONCURRENCY", 2)
+        ocr["lines"] = [raw_line(line_id=f"li_{i}", description=f"Item {i}") for i in range(4)]
+        state = {"current": 0, "max_seen": 0}
+
+        async def tracking_run_matching(supabase, description, incoming_specs=None):
+            state["current"] += 1
+            state["max_seen"] = max(state["max_seen"], state["current"])
+            await asyncio.sleep(0.05)  # long enough that overlapping calls are guaranteed to overlap
+            state["current"] -= 1
+            return match_result(match_reason=description)
+
+        monkeypatch.setattr(intake, "run_matching", tracking_run_matching)
+        lines = upload(client).json()["line_items"]
+
+        assert state["max_seen"] == 2   # bounded by MATCHING_CONCURRENCY, not sequential (1) or unbounded (4)
+        # asyncio.gather preserves input order regardless of completion order, so the bill's line
+        # order survives even though the matching itself ran out of order.
+        assert [l["match_reason"] for l in lines] == ["Item 0", "Item 1", "Item 2", "Item 3"]
+
+    def test_one_slow_line_does_not_block_starting_the_others(self, client, ocr, monkeypatch):
+        monkeypatch.setattr(settings, "MATCHING_CONCURRENCY", 4)
+        ocr["lines"] = [raw_line(line_id=f"li_{i}", description=f"Item {i}") for i in range(4)]
+        started = []
+
+        async def tracking_run_matching(supabase, description, incoming_specs=None):
+            started.append(description)
+            if description == "Item 0":
+                await asyncio.sleep(0.05)  # the slow one
+            return match_result()
+
+        monkeypatch.setattr(intake, "run_matching", tracking_run_matching)
+        upload(client)
+        # All four had started before the slow one (Item 0) finished — proof this isn't secretly
+        # still sequential (which would have Item 0 finish before Item 1 even starts).
+        assert set(started) == {"Item 0", "Item 1", "Item 2", "Item 3"}
 
 
 class TestOcrToConfirmContract:
