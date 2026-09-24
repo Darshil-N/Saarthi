@@ -24,6 +24,8 @@ RELATIONS = {
     ("goods_receipts", "vendors"): ("many_to_one", "vendor_id", "vendors", "id"),
     ("goods_receipts", "gr_line_items"): ("one_to_many", "id", "gr_line_items", "gr_id"),
     ("gr_line_items", "materials"): ("many_to_one", "material_id", "materials", "id"),
+    ("inventory", "materials"): ("many_to_one", "material_id", "materials", "id"),
+    ("audit_log", "profiles"): ("many_to_one", "actor_id", "profiles", "id"),
 }
 
 UNIQUE = {
@@ -59,7 +61,12 @@ class FakeSupabase:
         self.before_update = None  # optional hook(table, filters) to simulate concurrent writers
         self.calls: list[tuple[str, str]] = []
         self.storage = SimpleNamespace(from_=self._bucket)
-        self.auth = SimpleNamespace(admin=SimpleNamespace(sign_out=lambda jwt: None))
+        self._auth_users: list[SimpleNamespace] = []
+        self.auth = SimpleNamespace(admin=SimpleNamespace(
+            sign_out=lambda jwt: None,
+            list_users=lambda: list(self._auth_users),
+            create_user=self._auth_create_user,
+        ))
 
     # -- test helpers -----------------------------------------------------------------
     def seed(self, table: str, **row) -> dict:
@@ -68,11 +75,34 @@ class FakeSupabase:
         self.tables[table].append(row)
         return row
 
+    def seed_auth_user(self, email: str, user_id: str | None = None) -> SimpleNamespace:
+        """A user in the fake Auth admin list, independent of whether it has a profiles row."""
+        user = SimpleNamespace(id=user_id or str(uuid.uuid4()), email=email)
+        self._auth_users.append(user)
+        return user
+
     def fail(self, table: str, op: str, exc: Exception | None = None):
         self.failures[(table, op)] = exc or RuntimeError(f"injected failure on {table}.{op}")
 
     def rows(self, table: str) -> list[dict]:
         return self.tables[table]
+
+    def _auth_create_user(self, attrs: dict):
+        """Fakes supabase.auth.admin.create_user, including the handle_new_user trigger's
+        effect: a real Postgres trigger fires regardless of the caller, so the fake must too —
+        the new profile row is created here as entry_operator/inactive, matching migration 001's
+        least-privilege default, exactly as if the trigger had run."""
+        email = attrs.get("email")
+        if any(u.email == email for u in self._auth_users):
+            raise APIError({"message": "User already registered", "code": "23505", "details": "", "hint": None})
+        user_id = str(uuid.uuid4())
+        user = SimpleNamespace(id=user_id, email=email)
+        self._auth_users.append(user)
+        full_name = (attrs.get("user_metadata") or {}).get("full_name")
+        self.table("profiles").insert({
+            "id": user_id, "full_name": full_name, "role": "entry_operator", "is_active": False,
+        }).execute()
+        return SimpleNamespace(user=user)
 
     def _bucket(self, name):
         return SimpleNamespace(
@@ -403,6 +433,14 @@ class FakeQuery:
     def in_(self, col, vals):
         self.filters.append(("in", col, list(vals))); return self
 
+    def ilike(self, col, pattern):
+        self.filters.append(("ilike", col, pattern)); return self
+
+    def or_(self, filters: str):
+        """filters is PostgREST's or() syntax: 'col.op.value,col2.op2.value2' (OR'd together).
+        Only ilike/eq are supported — the only operators this project's or_() calls use."""
+        self.filters.append(("or", None, filters)); return self
+
     def order(self, col, desc=False):
         self.orders.append((col, desc)); return self
 
@@ -440,7 +478,23 @@ class FakeQuery:
                 return False
             if kind == "in" and v not in val:
                 return False
+            if kind == "ilike" and not (v is not None and str(val).strip("%").lower() in str(v).lower()):
+                return False
+            if kind == "or":
+                if not any(self._matches_or_clause(row, clause) for clause in val.split(",")):
+                    return False
         return True
+
+    def _matches_or_clause(self, row, clause: str) -> bool:
+        c_col, c_op, c_val = clause.split(".", 2)
+        v = self._value(row, c_col)
+        if v is None:
+            return False
+        if c_op == "ilike":
+            return c_val.strip("%").lower() in str(v).lower()
+        if c_op == "eq":
+            return str(v) == c_val
+        return False
 
     def _embed(self, table, rows, cols):
         tokens = [t for t in _split_top_level(cols) if re.match(r"^\w+\(.*\)$", t, re.S)]

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from config import settings
 from logging_config import configure_logging, request_id_ctx
-from routers import auth, dashboard, intake, inventory, matching, materials, vendors
+from routers import audit, auth, dashboard, intake, inventory, matching, materials, users, vendors
 
 configure_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("saarthi.api")
@@ -76,6 +76,8 @@ app.include_router(matching.router,  prefix="/matching",  tags=["Matching"])
 app.include_router(inventory.router, prefix="/inventory", tags=["Inventory"])
 app.include_router(vendors.router,   prefix="/vendors",   tags=["Vendors"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(audit.router,     prefix="/audit",     tags=["Audit"])
+app.include_router(users.router,     prefix="/users",     tags=["Users"])
 
 
 @app.get("/health")

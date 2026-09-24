@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import Client
 from dependencies import get_supabase, get_current_user, require_roles, CurrentUser
@@ -14,9 +14,28 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Plan D-7 (decided 2026-09-22): entry operator, engineer, accounts and admin may all approve
+# materials, matching matching.py's _REVIEWERS. This was missed when D-7 was first applied —
+# approve_material below still had the pre-D-7 role list until 2026-09-24.
+_GOVERNANCE_ROLES = ("entry_operator", "engineer", "accounts", "admin")
+
 
 class NLQueryRequest(BaseModel):
     query: str
+
+
+class MaterialEditRequest(BaseModel):
+    standard_description: Optional[str] = Field(default=None, min_length=1, max_length=500)
+    short_description: Optional[str] = Field(default=None, max_length=200)
+
+
+class BulkActionRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+    action: str  # "approve" | "deprecate"
+
+
+class DeprecateRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500)
 
 
 STOPWORDS = {"the", "a", "an", "is", "are", "of", "in", "to", "how", "many",
@@ -136,6 +155,32 @@ def nl_query(
         "result_count": len(results),
     }
 
+def _filtered_materials(
+    supabase: Client,
+    status_filter: Optional[str],
+    category: Optional[str],
+    subcategory: Optional[str],
+    search: Optional[str],
+    *,
+    count: str | None = None,
+):
+    q = supabase.table("materials").select(
+        "id,cnmc,category,subcategory,material_type,spec,quality_grade,"
+        "standard_description,short_description,unit_of_measure,status,"
+        "created_at,updated_at",
+        count=count,
+    )
+    if status_filter:
+        q = q.eq("status", status_filter)
+    if category:
+        q = q.eq("category", category)
+    if subcategory:
+        q = q.eq("subcategory", subcategory)
+    if search:
+        q = q.or_(f"standard_description.ilike.%{search}%,cnmc.ilike.%{search}%")
+    return q
+
+
 @router.get("")
 def list_materials(
     status_filter: Optional[str] = None,
@@ -147,21 +192,24 @@ def list_materials(
     supabase: Client = Depends(get_supabase),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    q = supabase.table("materials").select(
-        "id,cnmc,category,subcategory,material_type,spec,quality_grade,"
-        "standard_description,short_description,unit_of_measure,status,"
-        "created_at,updated_at"
-    )
-    if status_filter:
-        q = q.eq("status", status_filter)
-    if category:
-        q = q.eq("category", category)
-    if subcategory:
-        q = q.eq("subcategory", subcategory)
-    if search:
-        q = q.ilike("standard_description", f"%{search}%")
+    q = _filtered_materials(supabase, status_filter, category, subcategory, search)
     resp = q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
     return resp.data or []
+
+
+@router.get("/count")
+def count_materials(
+    status_filter: Optional[str] = None,
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    search: Optional[str] = None,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Total matching a filter, for pagination (Material Catalog — plan step 5.1.6/5.1.7)."""
+    q = _filtered_materials(supabase, status_filter, category, subcategory, search, count="exact")
+    return {"total": q.limit(1).execute().count or 0}
+
 
 @router.get("/{material_id}")
 def get_material(
@@ -174,12 +222,11 @@ def get_material(
         raise HTTPException(status_code=404, detail="Material not found")
     return resp.data
 
-# Who may approve materials is an open product decision (plan D-7); this keeps today's behaviour.
 @router.patch("/{material_id}/approve")
 def approve_material(
     material_id: str,
     supabase: Client = Depends(get_supabase),
-    current_user: CurrentUser = Depends(require_roles("admin", "entry_operator", "engineer")),
+    current_user: CurrentUser = Depends(require_roles(*_GOVERNANCE_ROLES)),
 ):
     material_id = require_uuid(material_id, "Material")
     existing = supabase.table("materials").select("*").eq("id", material_id).maybe_single().execute()
@@ -198,3 +245,128 @@ def approve_material(
                "material_approved","materials", material_id,
                {"status": old_status}, {"status": "approved"})
     return resp.data[0]
+
+
+@router.patch("/{material_id}/deprecate")
+def deprecate_material(
+    material_id: str,
+    body: DeprecateRequest = DeprecateRequest(),
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(require_roles(*_GOVERNANCE_ROLES)),
+):
+    """Plan step 7.1.1 — material governance: deprecate."""
+    material_id = require_uuid(material_id, "Material")
+    existing = supabase.table("materials").select("id, status").eq("id", material_id).maybe_single().execute()
+    if not existing or not existing.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Material not found")
+    old_status = existing.data.get("status")
+    now = datetime.now(timezone.utc).isoformat()
+    resp = supabase.table("materials").update({
+        "status": "deprecated",
+        "deprecated_by": current_user.id,
+        "deprecated_at": now,
+        "deprecation_reason": body.reason,
+    }).eq("id", material_id).execute()
+    if not resp.data:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Update failed")
+    log_action(supabase, current_user.id, current_user.role,
+               "material_deprecated", "materials", material_id,
+               {"status": old_status}, {"status": "deprecated", "reason": body.reason})
+    return resp.data[0]
+
+
+@router.patch("")
+def bulk_material_action(
+    body: BulkActionRequest,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(require_roles(*_GOVERNANCE_ROLES)),
+):
+    """Plan step 7.1.1 — bulk approve/deprecate. Applies to every id that exists; ids that don't
+    exist are silently skipped and reported back rather than failing the whole batch."""
+    if body.action not in ("approve", "deprecate"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="action must be approve or deprecate")
+
+    ids = [require_uuid(i, "Material") for i in body.ids]
+    existing = supabase.table("materials").select("id, status").in_("id", ids).execute().data or []
+    found_ids = [row["id"] for row in existing]
+    now = datetime.now(timezone.utc).isoformat()
+
+    if body.action == "approve":
+        payload = {"status": "approved", "approved_by": current_user.id, "approved_at": now}
+        action_name = "material_approved"
+    else:
+        payload = {"status": "deprecated", "deprecated_by": current_user.id, "deprecated_at": now}
+        action_name = "material_deprecated"
+
+    updated: list[dict] = []
+    for row in existing:
+        resp = supabase.table("materials").update(payload).eq("id", row["id"]).execute()
+        if resp.data:
+            updated.append(resp.data[0])
+            log_action(supabase, current_user.id, current_user.role, action_name, "materials",
+                       row["id"], {"status": row["status"]}, {"status": payload["status"]})
+
+    return {
+        "requested": len(ids),
+        "updated": len(updated),
+        "not_found": [i for i in ids if i not in found_ids],
+    }
+
+
+@router.patch("/{material_id}")
+def edit_material(
+    material_id: str,
+    body: MaterialEditRequest,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(require_roles(*_GOVERNANCE_ROLES)),
+):
+    """Plan step 7.1.1 — edit a material's description. Deliberately narrow: cnmc, category and
+    quality fields are not editable here (they drive the classification/matching logic)."""
+    material_id = require_uuid(material_id, "Material")
+    changes = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not changes:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Nothing to update")
+
+    existing = supabase.table("materials").select("id, standard_description, short_description") \
+        .eq("id", material_id).maybe_single().execute()
+    if not existing or not existing.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Material not found")
+
+    old_values = {k: existing.data.get(k) for k in changes}
+    resp = supabase.table("materials").update(changes).eq("id", material_id).execute()
+    if not resp.data:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Update failed")
+    log_action(supabase, current_user.id, current_user.role, "material_edited", "materials",
+               material_id, old_values, changes)
+    return resp.data[0]
+
+
+@router.get("/{material_id}/equivalents")
+def material_equivalents(
+    material_id: str,
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Materials confirmed equivalent to this one (approved matches, plan step 5.1.9) — checked
+    both directions, since a match can point either way depending on which line was matched
+    against which candidate at confirm time."""
+    material_id = require_uuid(material_id, "Material")
+    as_new = supabase.table("v_matching_queue_detailed").select("*") \
+        .eq("new_material_id", material_id).eq("status", "approved").execute().data or []
+    as_matched = supabase.table("v_matching_queue_detailed").select("*") \
+        .eq("matched_material_id", material_id).eq("status", "approved").execute().data or []
+
+    equivalents = [
+        {"id": r["matched_material_id"], "cnmc": r["matched_cnmc"], "standard_description": r["matched_description"]}
+        for r in as_new
+    ] + [
+        {"id": r["new_material_id"], "cnmc": r["new_cnmc"], "standard_description": r["new_description"]}
+        for r in as_matched
+    ]
+    seen: set[str] = set()
+    deduped = []
+    for eq in equivalents:
+        if eq["id"] not in seen:
+            seen.add(eq["id"])
+            deduped.append(eq)
+    return deduped

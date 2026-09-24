@@ -1,4 +1,4 @@
-from tests.conftest import LOC_1, MATERIAL_A, MATERIAL_B
+from tests.conftest import LOC_1, LOC_2, MATERIAL_A, MATERIAL_B
 
 MISSING_ID = "99999999-9999-9999-9999-999999999999"
 
@@ -115,6 +115,20 @@ class TestInventory:
         assert client.get("/inventory", params={"material_id": "bad"}).status_code == 404
         assert client.get("/inventory", params={"limit": 500}).status_code == 422
 
+    def test_map_shows_stocked_and_empty_bins(self, client, db):
+        db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=5, reorder_level=10)
+        # LOC_2 (seeded active in the db fixture) has no inventory row at all.
+        rows = {r["location_code"]: r for r in client.get("/inventory/map").json() if r["location_code"] in (LOC_1, LOC_2)}
+        assert rows[LOC_1]["material_id"] == MATERIAL_A and rows[LOC_1]["cnmc"] == "MECH-FSTNR-BOLT-M8X25-SS304-A"
+        assert rows[LOC_1]["quantity"] == 5
+        assert rows[LOC_2]["material_id"] is None and rows[LOC_2]["quantity"] == 0
+
+    def test_map_shows_multiple_materials_in_one_location(self, client, db):
+        db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=5)
+        db.seed("inventory", material_id=MATERIAL_B, location_code=LOC_1, quantity=3)
+        rows = [r for r in client.get("/inventory/map").json() if r["location_code"] == LOC_1]
+        assert {r["material_id"] for r in rows} == {MATERIAL_A, MATERIAL_B}
+
 
 class TestMaterials:
     def test_get_missing_and_malformed(self, client):
@@ -129,8 +143,65 @@ class TestMaterials:
     def test_approve_missing_is_404(self, client):
         assert client.patch(f"/materials/{MISSING_ID}/approve").status_code == 404
 
-    def test_accounts_cannot_approve(self, client_as):
-        assert client_as("accounts").patch(f"/materials/{MATERIAL_B}/approve").status_code == 403
+    def test_accounts_role_can_approve(self, client_as, db):
+        # Plan D-7 (decided 2026-09-22): accounts is one of the four roles allowed to approve
+        # materials, same as mapping review. materials.py's approve endpoint missed this when
+        # D-7 was first applied (fixed 2026-09-24).
+        r = client_as("accounts").patch(f"/materials/{MATERIAL_B}/approve")
+        assert r.status_code == 200 and r.json()["status"] == "approved"
+
+    def test_deprecate_sets_audit_fields_and_reason(self, client, db):
+        r = client.patch(f"/materials/{MATERIAL_A}/deprecate", json={"reason": "Superseded by a newer spec"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "deprecated" and body["deprecation_reason"] == "Superseded by a newer spec"
+        assert db.rows("audit_log")[0]["action"] == "material_deprecated"
+
+    def test_deprecate_missing_is_404(self, client):
+        assert client.patch(f"/materials/{MISSING_ID}/deprecate").status_code == 404
+
+    def test_bulk_approve_two_materials(self, client, db):
+        third = db.seed("materials", status="pending", cnmc="X-2", standard_description="A third one")
+        r = client.patch("/materials", json={"ids": [MATERIAL_B, third["id"]], "action": "approve"})
+        assert r.status_code == 200
+        assert r.json() == {"requested": 2, "updated": 2, "not_found": []}
+        assert {m["status"] for m in db.rows("materials") if m["id"] in (MATERIAL_B, third["id"])} == {"approved"}
+        assert len(db.rows("audit_log")) == 2
+
+    def test_bulk_reports_missing_ids_without_failing_the_rest(self, client, db):
+        r = client.patch("/materials", json={"ids": [MATERIAL_B, MISSING_ID], "action": "deprecate"})
+        assert r.status_code == 200
+        assert r.json() == {"requested": 2, "updated": 1, "not_found": [MISSING_ID]}
+
+    def test_bulk_invalid_action_is_422(self, client):
+        assert client.patch("/materials", json={"ids": [MATERIAL_A], "action": "delete"}).status_code == 422
+
+    def test_edit_description_sets_audit_fields(self, client, db):
+        r = client.patch(f"/materials/{MATERIAL_A}", json={"standard_description": "Updated description"})
+        assert r.status_code == 200 and r.json()["standard_description"] == "Updated description"
+        audit = db.rows("audit_log")[0]
+        assert audit["action"] == "material_edited" and audit["new_value"]["standard_description"] == "Updated description"
+
+    def test_edit_with_no_fields_is_422(self, client):
+        assert client.patch(f"/materials/{MATERIAL_A}", json={}).status_code == 422
+
+    def test_edit_missing_material_is_404(self, client):
+        assert client.patch(f"/materials/{MISSING_ID}", json={"standard_description": "x"}).status_code == 404
+
+    def test_equivalents_both_directions(self, client, db):
+        third = db.seed("materials", status="approved", cnmc="X-3", standard_description="Third material")
+        db.seed("v_matching_queue_detailed", new_material_id=MATERIAL_B, new_cnmc="B-CNMC", new_description="B desc",
+                matched_material_id=MATERIAL_A, matched_cnmc="A-CNMC", matched_description="A desc", status="approved")
+        db.seed("v_matching_queue_detailed", new_material_id=third["id"], new_cnmc="C-CNMC", new_description="C desc",
+                matched_material_id=MATERIAL_B, matched_cnmc="B-CNMC", matched_description="B desc", status="approved")
+
+        eq_ids = {e["id"] for e in client.get(f"/materials/{MATERIAL_B}/equivalents").json()}
+        assert eq_ids == {MATERIAL_A, third["id"]}   # B matched A directly, and C matched B
+
+    def test_count_matches_filters(self, client, db):
+        db.seed("materials", status="approved", cnmc="X-4", standard_description="Another approved one")
+        assert client.get("/materials/count").json()["total"] == 4
+        assert client.get("/materials/count", params={"status_filter": "approved"}).json()["total"] == 2
 
     def test_list_bounds(self, client):
         assert client.get("/materials", params={"limit": 0}).status_code == 422
@@ -204,6 +275,83 @@ class TestDashboard:
         assert r.status_code == 200   # the health page must render even when the thing it checks is down
         body = r.json()
         assert body["dbConnected"] is False and body["counts"] is None
+
+
+class TestAudit:
+    def test_lists_with_actor_name_and_filters(self, client_as, db):
+        db.seed("audit_log", actor_id="user-1", actor_role="admin", action="material_approved",
+                entity_type="materials", entity_id=MATERIAL_A, old_value={"status": "pending"},
+                new_value={"status": "approved"})
+        db.seed("audit_log", actor_id="user-1", actor_role="admin", action="mapping_rejected",
+                entity_type="matching_queue", entity_id="m-1")
+        db.seed("profiles", id="user-1", full_name="Amit Patel", role="admin")
+        admin = client_as("admin")
+
+        all_rows = admin.get("/audit").json()
+        assert len(all_rows) == 2 and all_rows[0]["actor_name"] == "Amit Patel"
+
+        filtered = admin.get("/audit", params={"action": "material_approved"}).json()
+        assert len(filtered) == 1 and filtered[0]["entity_type"] == "materials"
+
+    def test_non_admin_is_403(self, client_as):
+        assert client_as("engineer").get("/audit").status_code == 403
+
+    def test_database_failure_is_502(self, client_as, db):
+        db.fail("audit_log", "select")
+        r = client_as("admin").get("/audit")
+        assert r.status_code == 502 and "audit" in r.json()["detail"].lower()
+
+
+class TestUsers:
+    def test_list_includes_email_from_auth(self, client_as, db):
+        db.seed("profiles", id="u-1", full_name="Priya Nair", role="engineer", is_active=True)
+        db.seed_auth_user("priya@bharatoil.in", user_id="u-1")
+        rows = client_as("admin").get("/users").json()
+        assert next(r for r in rows if r["id"] == "u-1")["email"] == "priya@bharatoil.in"
+
+    def test_non_admin_is_403(self, client_as):
+        assert client_as("engineer").get("/users").status_code == 403
+
+    def test_create_user_sets_real_role_and_activates(self, client_as, db):
+        r = client_as("admin").post("/users", json={
+            "email": "newhire@bharatoil.in", "full_name": "New Hire", "role": "engineer",
+        })
+        assert r.status_code == 200
+        body = r.json()
+        assert body["role"] == "engineer" and "temporary_password" in body and len(body["temporary_password"]) >= 12
+
+        profile = next(p for p in db.rows("profiles") if p["id"] == body["id"])
+        assert profile["role"] == "engineer" and profile["is_active"] is True   # not left at the trigger's default
+        assert db.rows("audit_log")[0]["action"] == "user_created"
+
+    def test_create_user_invalid_role_is_422(self, client_as):
+        assert client_as("admin").post("/users", json={
+            "email": "x@bharatoil.in", "full_name": "X", "role": "superuser",
+        }).status_code == 422
+
+    def test_create_user_duplicate_email_is_409(self, client_as, db):
+        db.seed_auth_user("dup@bharatoil.in")
+        r = client_as("admin").post("/users", json={"email": "dup@bharatoil.in", "full_name": "Dup", "role": "engineer"})
+        assert r.status_code == 409
+
+    def test_deactivate_and_reactivate(self, client_as, db):
+        other = "66666666-6666-6666-6666-666666666666"
+        db.seed("profiles", id=other, full_name="Someone", role="engineer", is_active=True)
+        admin = client_as("admin")
+        r = admin.patch(f"/users/{other}/active", json={"is_active": False})
+        assert r.status_code == 200 and r.json()["is_active"] is False
+        assert db.rows("audit_log")[0]["action"] == "user_deactivated"
+
+        r2 = admin.patch(f"/users/{other}/active", json={"is_active": True})
+        assert r2.status_code == 200 and r2.json()["is_active"] is True
+
+    def test_cannot_deactivate_self(self, client_as, db):
+        db.seed("profiles", id="user-1", full_name="Self", role="admin", is_active=True)
+        r = client_as("admin").patch("/users/user-1/active", json={"is_active": False})
+        assert r.status_code == 400
+
+    def test_deactivate_missing_user_is_404(self, client_as):
+        assert client_as("admin").patch(f"/users/{MISSING_ID}/active", json={"is_active": False}).status_code == 404
 
 
 class TestRequestContext:

@@ -44,6 +44,61 @@ def list_locations(
     return resp.data or []
 
 
+@router.get("/map")
+def inventory_map(
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Every active location, plus whatever is stored there — including bins with no stock at
+    all, which the inventory table has no row for (plan step 5.1.3). One entry per
+    (location, material) pair; a location with several materials in it appears more than once,
+    a genuinely empty location appears once with material_id null."""
+    locations = (
+        supabase.table("locations")
+        .select("code, warehouse, aisle, rack, bin")
+        .eq("is_active", True)
+        .execute()
+    ).data or []
+    inv = (
+        supabase.table("inventory")
+        .select(
+            "id,material_id,location_code,quantity,reserved_quantity,reorder_level,max_stock,"
+            "last_movement_at,materials(cnmc,standard_description,short_description,unit_of_measure,category)"
+        )
+        .execute()
+    ).data or []
+
+    by_location: dict[str, list[dict]] = {}
+    for row in inv:
+        by_location.setdefault(row["location_code"], []).append(row)
+
+    result = []
+    for loc in locations:
+        rows = by_location.get(loc["code"])
+        if not rows:
+            result.append({
+                "location_code": loc["code"], "warehouse": loc.get("warehouse"), "aisle": loc.get("aisle"),
+                "rack": loc.get("rack"), "bin": loc.get("bin"), "material_id": None, "cnmc": None,
+                "standard_description": None, "short_description": None, "unit_of_measure": None,
+                "category": None, "quantity": 0, "reserved_quantity": 0, "reorder_level": None,
+                "max_stock": None, "last_movement_at": None,
+            })
+            continue
+        for r in rows:
+            m = r.get("materials") or {}
+            result.append({
+                "location_code": loc["code"], "warehouse": loc.get("warehouse"), "aisle": loc.get("aisle"),
+                "rack": loc.get("rack"), "bin": loc.get("bin"), "material_id": r["material_id"],
+                "cnmc": m.get("cnmc"), "standard_description": m.get("standard_description"),
+                "short_description": m.get("short_description"), "unit_of_measure": m.get("unit_of_measure"),
+                "category": m.get("category"), "quantity": r.get("quantity") or 0,
+                "reserved_quantity": r.get("reserved_quantity") or 0,
+                "reorder_level": r.get("reorder_level"), "max_stock": r.get("max_stock"),
+                "last_movement_at": r.get("last_movement_at"),
+            })
+    return result
+
+
 @router.get("/{inventory_id}")
 def get_inventory_item(
     inventory_id: str,
