@@ -4,7 +4,7 @@
 //
 // Example in App.jsx:
 //   import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-//   import adminRoutes from '../a_p/adminRoutes';
+//   import adminRoutes from '../dashboards/adminRoutes';
 //   const router = createBrowserRouter([
 //     ...existingRoutes,
 //     adminRoutes,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, BookOpen, ChevronRight, Package, Tag, Layers, X } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 const CATEGORY_TREE = {
   MECH: ['FSTNR', 'PIPE', 'VALVE', 'PUMP', 'BEARING', 'GEAR', 'SEAL'],

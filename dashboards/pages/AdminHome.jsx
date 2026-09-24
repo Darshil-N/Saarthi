@@ -4,7 +4,7 @@ import {
   Database, CheckCircle2, Clock, Copy, BarChart2,
   ArrowRight, AlertTriangle, Shield, Users
 } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 const StatusBadge = ({ status }) => {
   const colors = {

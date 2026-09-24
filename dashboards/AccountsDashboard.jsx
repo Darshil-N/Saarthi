@@ -3,8 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import AccountsSidebar from './AccountsSidebar';
 import { SidebarProvider, useSidebar } from './SidebarContext';
 import { Menu } from 'lucide-react';
-// Import the existing Header from arya_frontend
-import Header from '../arya_frontend/src/components/layout/Header';
+// Import the existing Header from frontend
+import Header from '../frontend/src/components/layout/Header';
 
 function AccountsShell() {
   const location = useLocation();

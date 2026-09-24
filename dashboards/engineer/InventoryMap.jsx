@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

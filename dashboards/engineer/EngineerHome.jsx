@@ -4,7 +4,7 @@ import {
   Database, Package, MessageSquare, Map,
   ArrowRight, CheckCircle2, Clock, TrendingUp
 } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 const MetricCard = ({ title, value, icon: Icon, color, description, onClick }) => (
   <div

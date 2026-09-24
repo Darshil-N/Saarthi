@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, CheckCircle, XCircle, AlertCircle, ChevronDown, Edit3, X, Check } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 const STATUS_FILTERS = ['all', 'pending', 'approved', 'deprecated'];
 

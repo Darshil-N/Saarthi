@@ -110,7 +110,7 @@ This replaces the original build plan (still available in git history). Progress
 - **2.2.4** Config cleanup: drop unused JWT_SECRET / python-jose; add google-genai; pin and document deps _(refs: B9, A5)_ — Removed unused JWT_SECRET and python-jose; model names/thresholds/limits are now settings. Not done: add google-genai (needed with 3.2.3).
 - **2.2.5** Remove dead code (mismatched models, unused prompts, broken match_materials_rpc.sql) _(refs: B9 · 🗑 Delete)_ — File deletions need approval.
 - **2.2.6** Bounds and pagination limits on all list endpoints _(refs: B8)_ — limit/offset bounds on materials, inventory and receipts.
-- **2.2.7** pytest scaffold with mocked Supabase and Gemini; first tests for auth and role checks _(refs: Q3)_ — 146 pytest tests with an in-memory fake Supabase (Arpit_Backend/tests). Run: venv\Scripts\python -m pytest
+- **2.2.7** pytest scaffold with mocked Supabase and Gemini; first tests for auth and role checks _(refs: Q3)_ — 146 pytest tests with an in-memory fake Supabase (backend/tests). Run: venv\Scripts\python -m pytest
 
 ---
 
@@ -287,7 +287,7 @@ This replaces the original build plan (still available in git history). Progress
 
 ### Part 9.1 — Structure and session
 
-- **9.1.1** Move a_p/ pages into arya_frontend/src and fix imports (no cross-tree imports) _(refs: Q1)_
+- **9.1.1** Move dashboards/ pages into frontend/src and fix imports (no cross-tree imports) _(refs: Q1)_
 - **9.1.2** shrindhi/: port anything still needed (MaterialDetail layout), then remove the app _(refs: Q2 · ❓ Decision 🗑 Delete)_ — Decision D-4; removal needs approval.
 - **9.1.3** Single API client with token refresh and 401 handling _(refs: S1)_
 - **9.1.4** Use Supabase session state (listener) instead of the mock_auth copy; document token-storage choice _(refs: S1, S2)_

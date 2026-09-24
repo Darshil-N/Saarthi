@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, ShieldOff, Search, X, Copy } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 const ROLES = ['admin', 'entry_operator', 'engineer', 'accounts'];
 

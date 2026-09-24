@@ -1,30 +1,29 @@
 import React from 'react';
-import { Outlet as RouterOutlet, useLocation as useRouterLocation } from 'react-router-dom';
-import AdminSidebar from './AdminSidebar';
-import { SidebarProvider, useSidebar } from './SidebarContext';
+import { Outlet, useLocation } from 'react-router-dom';
+import EngineerSidebar from './EngineerSidebar';
+import { SidebarProvider, useSidebar } from '../SidebarContext';
 import { Menu } from 'lucide-react';
-import Header from '../arya_frontend/src/components/layout/Header';
+import Header from '../../frontend/src/components/layout/Header';
 
 const getPageTitle = (pathname) => {
   switch (true) {
-    case pathname === '/admin': return 'Admin Dashboard';
-    case pathname.startsWith('/admin/material-governance'): return 'Material Governance';
-    case pathname.startsWith('/admin/audit-trail'): return 'Audit Trail';
-    case pathname.startsWith('/admin/duplicate-detection'): return 'Duplicate Detection';
-    case pathname.startsWith('/admin/user-management'): return 'User Management';
-    case pathname.startsWith('/admin/system-health'): return 'System Health';
-    default: return 'Admin Dashboard';
+    case pathname === '/engineer': return 'Engineer Dashboard';
+    case pathname.startsWith('/engineer/nl-query'): return 'NL Query — Material Search';
+    case pathname.startsWith('/engineer/catalog'): return 'Material Catalog';
+    case pathname.startsWith('/engineer/inventory-map'): return 'Inventory Map';
+    default: return 'Engineer Dashboard';
   }
 };
 
-function AdminShell() {
-  const location = useRouterLocation();
+function EngineerShell() {
+  const location = useLocation();
   const { toggle } = useSidebar();
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      <AdminSidebar />
+      <EngineerSidebar />
       <div className="flex-1 flex flex-col md:ml-60 transition-all duration-300 relative">
+        {/* Header */}
         <div className="flex items-center">
           <button
             onClick={toggle}
@@ -38,17 +37,17 @@ function AdminShell() {
           </div>
         </div>
         <main key={location.pathname} className="flex-1 overflow-y-auto p-6 page-fade-in">
-          <RouterOutlet />
+          <Outlet />
         </main>
       </div>
     </div>
   );
 }
 
-export default function AdminDashboard() {
+export default function EngineerDashboard() {
   return (
     <SidebarProvider>
-      <AdminShell />
+      <EngineerShell />
     </SidebarProvider>
   );
 }

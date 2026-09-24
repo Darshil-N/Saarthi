@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Database, Cpu, AlertCircle, CheckCircle2, RefreshCw, Clock, Zap } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 const HealthCard = ({ title, value, unit, status, icon: Icon, description }) => {
   const statusColors = {

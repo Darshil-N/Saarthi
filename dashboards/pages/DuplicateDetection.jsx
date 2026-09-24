@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Copy, CheckCircle, XCircle, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 // Real matching_queue.status values (schema.sql) — this page previously used
 // 'pending_review' / 'merged', which never existed; 'approved' is what the backend calls a

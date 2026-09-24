@@ -181,7 +181,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON ROUTINES FROM anon, auth
 -- accounts and admin may all review (approve/reject) matches. The RLS
 -- policy on matching_queue previously only allowed entry_operator/admin;
 -- widened here to match the backend's _REVIEWERS list
--- (Arpit_Backend/routers/matching.py). This does not currently gate the
+-- (backend/routers/matching.py). This does not currently gate the
 -- API, which connects as service_role, but keeps RLS honest as a second
 -- line of defense and for anything that later reads matching_queue
 -- directly under a user's own session.

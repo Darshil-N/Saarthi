@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Download, Filter, RefreshCw } from 'lucide-react';
-import api from '../../arya_frontend/src/lib/api';
+import api from '../../frontend/src/lib/api';
 
 // Real audit_log.action values (services/audit_service.py callers) and entity_type values —
 // this page previously used INSERT/UPDATE/DELETE/APPROVE/DEPRECATE and singular entity names,

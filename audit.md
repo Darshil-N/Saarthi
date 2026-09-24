@@ -1,7 +1,7 @@
 # Saarthi — Codebase Audit
 
 **Date:** 2026-09-19
-**Scope:** `Arpit_Backend/` (FastAPI), `arya_frontend/` (main React app), `a_p/` (Engineer / Accounts / Admin pages imported by the main app), `shrindhi/` (separate React app), `schema.sql`, seed scripts, `plan.md`, `progress.md`.
+**Scope:** `backend/` (FastAPI), `frontend/` (main React app), `a_p/` (Engineer / Accounts / Admin pages imported by the main app), `shrindhi/` (separate React app), `schema.sql`, seed scripts, `plan.md`, `progress.md`.
 **Method:** Static read of all source against `schema.sql`, plus a few local reproductions. **No Supabase query was run and nothing in the project was modified.**
 
 ## How to read this file
@@ -27,7 +27,7 @@ Every finding ID here is mapped to fix steps in `plan.md` and tracked in `progre
 
 ---
 
-## 1. Entry operator flow (`arya_frontend`, `/intake/*`)
+## 1. Entry operator flow (`frontend`, `/intake/*`)
 
 - **E1 [C] Confirm Receipt fails on an empty date** — `intakeStore.js` initialises `receipt_date` to `''`; `OCRUpload.handleConfirm` never validates it. Backend `ConfirmRequest.receipt_date: date` returns 422 ("input is too short"). The hook shows only "Failed to confirm receipt", so the click appears to do nothing. Even on success the store resets, no GR number is shown and there is no redirect. — `verified`
 - **E2 [C] Confirm never updates stock or price history** — `intake.py:250-298` inserts `goods_receipts` and `gr_line_items` only. No `inventory` upsert and no `price_history` insert exists anywhere in the backend. Lines for new materials are stored with `material_id = NULL`. Plan steps 2.4.4 / 2.4.5 were marked done but are not implemented. — `code`
@@ -45,7 +45,7 @@ Every finding ID here is mapped to fix steps in `plan.md` and tracked in `progre
 - **E14 [M] OCR and barcode flows share one store** — items from both tabs mix; the chosen file is not cleared after success; no client-side file-size check although the bucket limit is 10 MB. — `code`
 - **E15 [M] "Locations" page is a stub** — sidebar entry leads to "Coming soon". — `code`
 
-## 2. Backend API (`Arpit_Backend`)
+## 2. Backend API (`backend`)
 
 - **B1 [C] Missing role checks on write endpoints** — `/intake/confirm` and `/intake/barcode` only require a valid token. Any logged-in role can create goods receipts through the service-key client (which bypasses RLS). — `code`
 - **B2 [H] `.single()` turns "not found" into HTTP 500** — used in `matching.py`, `inventory.py`, `auth.py`; postgrest raises when zero rows match, so the `if not resp.data → 404` branches are unreachable. — `code`
@@ -101,7 +101,7 @@ Every finding ID here is mapped to fix steps in `plan.md` and tracked in `progre
 - **D2 [C] Role taken from signup metadata** — `handle_new_user` reads `raw_user_meta_data->>'role'`. If public signup is enabled, anyone can register as `admin`. — `code` (signup setting `db-unverified`)
 - **D3 [H] Views and functions bypass RLS / are over-granted** — views are not `security_invoker`; `GRANT ALL … TO anon` covers views and `SECURITY DEFINER` RPCs (`get_admin_dashboard_stats`, `get_inventory_value_by_category`), so they may be callable without login; `SECURITY DEFINER` functions have no `SET search_path`. — `code` (`db-unverified`)
 - **D4 [M] Vector index may hide candidates** — `ivfflat (lists = 100)` on a table of tens of rows; with default probes recall can be poor or empty. — `db-unverified`
-- **D5 [L] Two identical copies of `schema.sql`** (repo root and `Arpit_Backend/`) will drift; no migrations folder. — `code`
+- **D5 [L] Two identical copies of `schema.sql`** (repo root and `backend/`) will drift; no migrations folder. — `code`
 
 ## 8. Auth & session (frontend)
 
@@ -111,10 +111,10 @@ Every finding ID here is mapped to fix steps in `plan.md` and tracked in `progre
 
 ## 9. Structure, build and quality
 
-- **Q1 [H] Cross-tree imports** — `arya_frontend/src/App.jsx` imports from `../../a_p/**`; `a_p/AdminDashboard.jsx` imports back from `../arya_frontend/src/**`; `a_p/utils/supabase.js` re-exports arya's client. Builds locally, but a hosted build whose root is `arya_frontend` may not include `a_p`. — `code` (hosting behaviour unverified)
+- **Q1 [H] Cross-tree imports** — `frontend/src/App.jsx` imports from `../../a_p/**`; `a_p/AdminDashboard.jsx` imports back from `../frontend/src/**`; `a_p/utils/supabase.js` re-exports arya's client. Builds locally, but a hosted build whose root is `frontend` may not include `a_p`. — `code` (hosting behaviour unverified)
 - **Q2 [M] `shrindhi/` is dead code** — a separate Vite app with `isAuthenticated: true` and a hardcoded dev engineer, ~1,100 lines of mock materials; nothing imports it. Its `MaterialDetail` and `MyQueries` pages exist nowhere else. — `code`
 - **Q3 [M] No tests, no lint config, single 1.7 MB chunk** — `npm run lint` has no ESLint config; no test files anywhere; production build is one chunk. — `verified` (build)
-- **Q4 [M] Uncommitted work** — 12 modified files and 1 untracked file (`Arpit_Backend/seed_demo_data.py`) in the working tree. — `verified` (`git status`)
+- **Q4 [M] Uncommitted work** — 12 modified files and 1 untracked file (`backend/seed_demo_data.py`) in the working tree. — `verified` (`git status`)
 - **Q5 [L] Hygiene** — `README.md` is 9 bytes; root `package-lock.json` is empty; `.uv.err` / `.uvicorn.err` in repo root; data access is a mix of API calls and direct Supabase queries. — `code`
 
 ## 10. Landing page and project records

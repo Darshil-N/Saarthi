@@ -24,7 +24,7 @@ so the corresponding plan.md/progress.md steps can be marked done.
 | `002_confirm_and_approve_rpcs.sql` | Write (DDL, additive) | Phase 1.2 — the `confirm_receipt` and `approve_mapping` transactional functions (steps 1.2.2, 1.2.3), plus a `client_draft_id` column on `goods_receipts`. **Applied 2026-09-22.** `approve_mapping` has since been live-verified (2026-09-22 and 2026-09-24); `confirm_receipt` has not yet completed a live end-to-end run (an attempt was stopped for taking too long — see progress.md). |
 | `003_dashboard_demo_data.sql` | Write (DML, additive, not a migration) | Not schema — a small, purely-additive set of rows (2 materials, 1 inventory row, 1 goods receipt, 2 matching_queue rows) so every dashboard has something real and non-zero to show while testing. Reads as ordinary catalog data, no "demo" marker in the values themselves; its cleanup block (commented out) finds the rows by their exact inserted values instead. Nothing existing is modified. This is **not** the Phase 8 "one consistent dataset" (still open) — just enough to click through the UI. |
 
-`schema.sql` (repo root and `Arpit_Backend/`, currently identical copies — audit
+`schema.sql` (repo root and `backend/`, currently identical copies — audit
 finding D5) stays as the historical "run this on a brand-new empty database" bootstrap
 file. Once there's a real live database, these numbered migrations are the source of
 truth for further changes; `schema.sql` itself is not re-run. Removing the duplicate

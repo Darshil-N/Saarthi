@@ -10,27 +10,27 @@ import NewReceipt from './pages/entry/NewReceipt';
 import PendingApprovals from './pages/entry/PendingApprovals';
 import ReceiptHistory from './pages/entry/ReceiptHistory';
 import { Locations } from './pages/Stubs';
-import EngineerDashboard from '../../a_p/engineer/EngineerDashboard';
-import EngineerHome from '../../a_p/engineer/EngineerHome';
-import NLQuery from '../../a_p/engineer/NLQuery';
-import MaterialCatalog from '../../a_p/engineer/MaterialCatalog';
-import InventoryMap from '../../a_p/engineer/InventoryMap';
-import AccountsDashboard from '../../a_p/AccountsDashboard';
-import AccountsHome from '../../a_p/pages/AccountsHome';
-import PriceIntelligence from '../../a_p/pages/PriceIntelligence';
-import StockValuation from '../../a_p/pages/StockValuation';
-import VendorAnalysis from '../../a_p/pages/VendorAnalysis';
-import PurchaseHistory from '../../a_p/pages/PurchaseHistory';
+import EngineerDashboard from '../../dashboards/engineer/EngineerDashboard';
+import EngineerHome from '../../dashboards/engineer/EngineerHome';
+import NLQuery from '../../dashboards/engineer/NLQuery';
+import MaterialCatalog from '../../dashboards/engineer/MaterialCatalog';
+import InventoryMap from '../../dashboards/engineer/InventoryMap';
+import AccountsDashboard from '../../dashboards/AccountsDashboard';
+import AccountsHome from '../../dashboards/pages/AccountsHome';
+import PriceIntelligence from '../../dashboards/pages/PriceIntelligence';
+import StockValuation from '../../dashboards/pages/StockValuation';
+import VendorAnalysis from '../../dashboards/pages/VendorAnalysis';
+import PurchaseHistory from '../../dashboards/pages/PurchaseHistory';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 // Admin Imports
-import AdminDashboard from '../../a_p/AdminDashboard';
-import AdminHome from '../../a_p/pages/AdminHome';
-import MaterialGovernance from '../../a_p/pages/MaterialGovernance';
-import AuditTrail from '../../a_p/pages/AuditTrail';
-import DuplicateDetection from '../../a_p/pages/DuplicateDetection';
-import UserManagement from '../../a_p/pages/UserManagement';
-import SystemHealth from '../../a_p/pages/SystemHealth';
+import AdminDashboard from '../../dashboards/AdminDashboard';
+import AdminHome from '../../dashboards/pages/AdminHome';
+import MaterialGovernance from '../../dashboards/pages/MaterialGovernance';
+import AuditTrail from '../../dashboards/pages/AuditTrail';
+import DuplicateDetection from '../../dashboards/pages/DuplicateDetection';
+import UserManagement from '../../dashboards/pages/UserManagement';
+import SystemHealth from '../../dashboards/pages/SystemHealth';
 
 function App() {
   const init = useAuthStore((s) => s.init);
