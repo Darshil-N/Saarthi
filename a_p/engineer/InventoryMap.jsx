@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -48,13 +48,7 @@ export default function InventoryMap() {
   const fetchInventory = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select(
-          'id, material_id, location_code, quantity, reserved_quantity, reorder_level, max_stock, last_movement_at,' +
-          'materials(id, cnmc, standard_description, short_description, unit_of_measure, category)'
-        );
-      if (error) throw error;
+      const { data } = await api.get('/inventory/map');
       setInventory(data || []);
       setLastRefresh(new Date());
     } catch (err) {
@@ -64,23 +58,12 @@ export default function InventoryMap() {
     }
   };
 
-  useEffect(() => {
-    fetchInventory();
+  // No live subscription — inventory isn't in Supabase's realtime publication yet (plan G5,
+  // step 1.2.7). Manual refresh (button above) is the only way to see new data for now.
+  useEffect(() => { fetchInventory(); }, []);
 
-    // Subscribe to real-time updates on inventory table
-    const channel = supabase
-      .channel('inventory-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'inventory' },
-        () => { fetchInventory(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  // Group inventory by warehouse → aisle → rack → bin
+  // Group inventory by warehouse → aisle → rack → bin. Every bin from the backend appears here,
+  // including genuinely empty ones (material_id null) — plan step 5.1.3.
   const warehouseData = React.useMemo(() => {
     const data = {};
     for (const item of inventory) {
@@ -93,7 +76,7 @@ export default function InventoryMap() {
       if (!aisle[loc.rack]) aisle[loc.rack] = {};
       const rack = aisle[loc.rack];
       if (!rack[loc.full]) rack[loc.full] = [];
-      rack[loc.full].push(item);
+      if (item.material_id) rack[loc.full].push(item);
     }
     return data;
   }, [inventory]);
@@ -133,7 +116,9 @@ export default function InventoryMap() {
         <div className="flex items-center gap-3">
           {lastRefresh && (
             <span className="text-xs text-slate-400">
-              Live · updated {lastRefresh.toLocaleTimeString('en-IN')}
+              {/* Not live — inventory isn't in Supabase's realtime publication yet (plan G5).
+                  Says so plainly instead of claiming "Live" (plan step 5.1.5). */}
+              Updated {lastRefresh.toLocaleTimeString('en-IN')} · click Refresh for the latest
             </span>
           )}
           <button
@@ -249,15 +234,15 @@ export default function InventoryMap() {
                 <div key={i} className="px-5 py-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-mono text-xs text-teal-600">{item.materials?.cnmc || '—'}</p>
+                      <p className="font-mono text-xs text-teal-600">{item.cnmc || '—'}</p>
                       <p className="text-sm font-medium text-slate-800 mt-0.5 leading-snug">
-                        {item.materials?.standard_description || item.material_id}
+                        {item.standard_description || item.material_id}
                       </p>
-                      <p className="text-xs text-slate-400 mt-1">{item.materials?.category}</p>
+                      <p className="text-xs text-slate-400 mt-1">{item.category}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className={`text-xl font-bold ${colors.text}`}>{item.quantity}</p>
-                      <p className="text-xs text-slate-400">{item.materials?.unit_of_measure || 'EA'}</p>
+                      <p className="text-xs text-slate-400">{item.unit_of_measure || 'EA'}</p>
                       <span className={`text-xs font-medium ${colors.text}`}>{colors.label}</span>
                     </div>
                   </div>

@@ -1,8 +1,8 @@
 # Saarthi — Progress Tracker
 
-**Last updated:** 2026-09-22 — `approve_mapping` verified working live (merge/deprecate/audit) after a mistaken direct material approval was corrected; a full live OCR-to-confirm test was attempted but stopped for taking 8+ minutes (real finding for 3.2.1), so `confirm_receipt` is still unverified live
-**Overall:** 29 / 146 steps complete
-**Status:** 🟡 In progress — no open decisions remain; Phase 1.1 access control is live and mostly confirmed; 1.2.3/approve_mapping has partial live proof; 1.2.2/confirm_receipt still needs a (short) live test
+**Last updated:** 2026-09-24 — Engineer/Admin/System Health/Duplicate Detection dashboards and Material Catalog/Inventory Map/Material Governance/Audit Trail/User Management all rewired from broken direct-Supabase calls to real backend endpoints; two of them (Audit Trail, User Management) were never actually functional even before this session. 172 backend tests pass; read endpoints verified live; nothing browser-verified yet; new write endpoints (deprecate/bulk/edit materials, create/deactivate users) not yet exercised live.
+**Overall:** 32 / 146 steps complete
+**Status:** 🟡 In progress — no open decisions remain; Phase 1 (DB security) is live and mostly confirmed; Phase 1.2's confirm_receipt still needs a live test; most of Phase 5 (Engineer) and a third of Phase 7 (Admin) now have real backend + frontend wiring, pending browser verification
 
 ## How to use this file
 
@@ -21,9 +21,9 @@
 | 2 | Backend Foundation | 8 / 14 | 🟡 In progress |
 | 3 | Intake Pipeline (OCR, Barcode, Confirm, Matching) | 11 / 30 | 🟡 In progress |
 | 4 | Natural-Language Query (real Gemini) | 0 / 10 | ⚪ Not started |
-| 5 | Engineer Dashboard | 0 / 9 | ⚪ Not started |
+| 5 | Engineer Dashboard | 0 / 9 | 🟡 In progress |
 | 6 | Accounts Dashboard on Real Data | 0 / 14 | ⚪ Not started |
-| 7 | Admin Dashboard | 2 / 12 | 🟡 In progress |
+| 7 | Admin Dashboard | 5 / 12 | 🟡 In progress |
 | 8 | One Consistent Dataset | 0 / 11 | ⚪ Not started |
 | 9 | Frontend Structure, Session & Quality | 0 / 11 | ⚪ Not started |
 | 10 | Verification & Deployment | 0 / 8 | ⚪ Not started |
@@ -210,13 +210,13 @@
 |---|---|---|---|---|---|
 | 5.1.1 | Engineer Home: correct columns, low-stock from v_low_stock_alerts / reorder levels | [~] | G3 |  | Rebuilt 2026-09-24: `EngineerHome.jsx` (in `a_p/engineer/`, cross-imported into `arya_frontend`) queried Supabase directly from the browser with the anon key — broken by migration 001's grant revocation (see G-new below) and had a pre-existing bug (`quantity_on_hand` column that doesn't exist; the real column is `quantity`). Replaced with a real backend endpoint `GET /dashboard/engineer` (counts, 6 recent approved materials, low-stock from `v_low_stock_alerts` — genuine reorder-level alerts, not just "5 smallest numbers"); `EngineerHome.jsx` now calls it via the shared `api` client. Unit-tested (2 new tests); verified live via curl (real counts: 30 materials, 20 approved, 6 pending, 14 inventory locations). Frontend production build succeeds. Not yet browser-verified (no screenshot/click-through). |
 | 5.1.2 | Decide whether engineers may see pending materials (RLS) or the KPIs are relabelled | [ ] | G7 | ❓ Decision | Decided 2026-09-22 (D-8): engineers may see pending materials; KPIs are not relabelled. Not yet implemented (Phase 5 not started). |
-| 5.1.3 | Inventory map built from locations (empty bins shown) joined with inventory | [ ] | G5 |  |  |
-| 5.1.4 | Bin colours from each row's reorder_level and max_stock | [ ] | G5 |  |  |
-| 5.1.5 | Realtime updates working, or remove the 'Live' label | [ ] | G5 | ❓ Decision |  |
-| 5.1.6 | Catalog category tree loaded from the database (matches CNMC tree, includes CIVIL) | [ ] | G6 |  |  |
-| 5.1.7 | Real debounce, page reset on search, safe escaping of search text | [ ] | G6 |  |  |
-| 5.1.8 | Material detail route: specs, inventory by bin, price history | [ ] | G6 |  | May reuse the layout of shrindhi MaterialDetail (D-4). |
-| 5.1.9 | Equivalent materials via an access-safe RPC, both directions | [ ] | G6, G7 |  |  |
+| 5.1.3 | Inventory map built from locations (empty bins shown) joined with inventory | [~] | G5 |  | Rebuilt 2026-09-24: `InventoryMap.jsx` queried Supabase directly (broken by migration 001). New `GET /inventory/map` returns every active location joined with its stock — including bins with no inventory row at all (`material_id: null`), which the old direct query could never show since it only ever saw rows that existed. Unit-tested (2 new tests: stocked+empty bins, multiple materials in one location); verified live. Not yet browser-verified. |
+| 5.1.4 | Bin colours from each row's reorder_level and max_stock | [~] | G5 |  | Unaffected logic (`getBinColor` in `InventoryMap.jsx` already used reorder_level/max_stock) — now fed real per-bin data instead of a broken direct query. Not yet browser-verified. |
+| 5.1.5 | Realtime updates working, or remove the 'Live' label | [~] | G5 | ❓ Decision |  Decided 2026-09-24 (as part of this fix, not a separate ask — realtime setup (G5, step 1.2.7) is a live-DB change out of scope for a frontend fix round): removed the postgres_changes subscription (it was silently doing nothing without the publication set up) and the "Live" label text; the map now says plainly that Refresh is manual. |
+| 5.1.6 | Catalog category tree loaded from the database (matches CNMC tree, includes CIVIL) | [ ] | G6 |  | Not done — `MaterialCatalog.jsx`'s category tree is still a hardcoded `CATEGORY_TREE` object, not loaded from the database. Out of scope for this round (the list/search/detail itself was the priority); tracked separately. |
+| 5.1.7 | Real debounce, page reset on search, safe escaping of search text | [~] | G6 |  | `MaterialCatalog.jsx` rewired to `GET /materials` + `GET /materials/count` (was broken by migration 001); the existing 400ms debounce was kept. Search text now goes through the backend's `.or_()` call (parameterized by supabase-py, not string-concatenated SQL), closing the safe-escaping half of this step. Not yet browser-verified. |
+| 5.1.8 | Material detail route: specs, inventory by bin, price history | [~] | G6 |  | `MaterialCatalog.jsx`'s detail panel (specs + inventory by bin) rewired to `GET /materials/{id}` + `GET /inventory?material_id=`. Not done: price history in the detail panel — no UI for it yet (the data exists via `price_history`, no endpoint or panel section built this round). Not yet browser-verified. |
+| 5.1.9 | Equivalent materials via an access-safe RPC, both directions | [~] | G6, G7 |  | New `GET /materials/{id}/equivalents` (not a DB RPC — implemented in the backend against `v_matching_queue_detailed`, checking both directions: this material as the new side or the matched side of an approved match). `MaterialCatalog.jsx`'s detail panel rewired to use it. Unit-tested (both-directions case); verified live. Not yet browser-verified. |
 
 ---
 
@@ -250,22 +250,22 @@
 ---
 
 # Phase 7 — Admin Dashboard
-**Steps complete:** 2 / 12
+**Steps complete:** 5 / 12
 
-## Part 7.1 — Material governance  (0 / 3)
-
-| # | Step | Status | Refs | Flags | Notes |
-|---|---|---|---|---|---|
-| 7.1.1 | Backend endpoints: approve, deprecate, bulk, edit, merge — each with audit, approved_by/at, deprecated_* fields | [ ] | M4, B8 |  |  |
-| 7.1.2 | Governance UI calls the backend; confirmation dialogs for bulk actions | [ ] | M4 |  |  |
-| 7.1.3 | Server-side pagination and safe search | [ ] | M4 |  |  |
-
-## Part 7.2 — Audit trail  (0 / 2)
+## Part 7.1 — Material governance  (1 / 3)
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 7.2.1 | Audit query endpoint (paginated; filters: actor, action, entity, date range) | [ ] | M2, M7, B8 |  |  |
-| 7.2.2 | Audit UI: correct columns, action/entity values from the data, date filter, actor names, escaped CSV | [ ] | M2, M7 |  |  |
+| 7.1.1 | Backend endpoints: approve, deprecate, bulk, edit, merge — each with audit, approved_by/at, deprecated_* fields | [x] | M4, B8 |  | Added 2026-09-24: `PATCH /materials/{id}/deprecate` (deprecated_by/at/reason), `PATCH /materials` (bulk approve/deprecate, reports not-found ids without failing the batch), `PATCH /materials/{id}` (edit description). Merge already existed (`approve_mapping` RPC, live-verified twice already this session). All four write audit_log. Also fixed `approve_material`'s role list, which missed decision D-7 when it was first applied — it still excluded `accounts` until today. 7 new unit tests; verified live (read side only — the writes weren't exercised against the live DB this round, by choice, pending the user trying them through the UI). |
+| 7.1.2 | Governance UI calls the backend; confirmation dialogs for bulk actions | [~] | M4 |  | `MaterialGovernance.jsx` rewired to the real endpoints above (was broken by migration 001 — direct Supabase reads/writes). Not done: confirmation dialogs before a bulk action fires (currently fires immediately, same as before). Not yet browser-verified. |
+| 7.1.3 | Server-side pagination and safe search | [~] | M4 |  | `GET /materials` already paginates (limit/offset) and searches via a parameterized `.or_()` call; `MaterialGovernance.jsx` requests up to 100 rows per load with no page controls in the UI yet (no next/previous — matches its pre-existing design, not something this round added or removed). |
+
+## Part 7.2 — Audit trail  (1 / 2)
+
+| # | Step | Status | Refs | Flags | Notes |
+|---|---|---|---|---|---|
+| 7.2.1 | Audit query endpoint (paginated; filters: actor, action, entity, date range) | [x] | M2, M7, B8 |  | New `routers/audit.py` — `GET /audit`, admin-only (matches the `audit_select_admin` RLS policy), paginated, filtered by actor/action/entity_type/date range, with the actor's name joined in from `profiles`. 3 unit tests; verified live with real historical audit data (materials_merged, mapping_approved rows from earlier this session, correctly showing "Amit Patel" as the actor). |
+| 7.2.2 | Audit UI: correct columns, action/entity values from the data, date filter, actor names, escaped CSV | [~] | M2, M7 |  | `AuditTrail.jsx` rewritten 2026-09-24 — it was using columns (`old_values`/`new_values`/`metadata`) and action/entity values (`INSERT`, `material`, `goods_receipt`) that never existed in the real schema; never worked, independent of migration 001. Now uses real actions/entity types, shows the actor's name (not a truncated id), and the CSV export properly quotes/escapes fields (a real bug in the old version — any comma in a description would have corrupted the file). Not done: a date-range filter UI (the backend supports `from_date`/`to_date`; no date pickers added this round). Not yet browser-verified. |
 
 ## Part 7.3 — Duplicate detection  (2 / 3)
 
@@ -275,12 +275,12 @@
 | 7.3.2 | Merge / reject actions via the approve_mapping RPC with audit | [x] | M1 |  | Already built in the D-6 rewiring (1.2.3/3.3.6) and live-verified twice this session: once correcting a mistaken direct material approval (merge, deprecate, audit all confirmed correct on real data), once via the pytest suite's merge scenario. |
 | 7.3.3 | Duplicate detection UI rewired to the new endpoints | [~] | M1 |  | `DuplicateDetection.jsx` rewritten 2026-09-24 — it was built against columns and statuses (`incoming_material_id`, `similarity_score`, `pending_review`, `'merged'`) that never existed in the real schema, so it never worked, independent of anything else. Now uses `/matching/stats`, `/matching?status=`, and the real approve/reject endpoints with real column names and statuses. Frontend build succeeds; not yet browser-verified. |
 
-## Part 7.4 — Users and system health  (0 / 4)
+## Part 7.4 — Users and system health  (1 / 4)
 
 | # | Step | Status | Refs | Flags | Notes |
 |---|---|---|---|---|---|
-| 7.4.1 | Admin-only create-user endpoint (auth user + profile) and role change with audit | [ ] | M3, B8 |  |  |
-| 7.4.2 | User list with correct columns; prevent self-deactivation; enforce is_active | [ ] | M3, B4 |  |  |
+| 7.4.1 | Admin-only create-user endpoint (auth user + profile) and role change with audit | [~] | M3, B8 |  | New `routers/users.py` — `POST /users` creates a real Supabase Auth user (not a fake `profiles` insert with a random UUID, which is what the old direct-Supabase code did and would always have failed the `profiles.id -> auth.users.id` foreign key). `handle_new_user` still fires and creates a least-privilege profile (migration 001); the intended role/active status/department are applied right after in the same request. A one-time temporary password is generated and returned (no email delivery is configured to invite the user instead) — never logged. Audited (`user_created`). Not done: changing an *existing* user's role after creation (only set at creation time). 5 unit tests; not yet exercised against the live database (creates a real auth account, so held back pending the user's go-ahead — see 7.1.1's note). |
+| 7.4.2 | User list with correct columns; prevent self-deactivation; enforce is_active | [x] | M3, B4 |  | `GET /users` (real columns — the old direct query used `org_unit`, which doesn't exist; the real column is `department` — plus email joined in from Supabase Auth, which `profiles` doesn't store at all) and `PATCH /users/{id}/active`, which refuses to deactivate the caller's own account (400) and is audited. 4 unit tests; verified live (`GET /users` returns real users with real emails correctly joined). `UserManagement.jsx` rewired to both. |
 | 7.4.3 | System health: real DB, Gemini/Ollama status, recent errors, table sizes | [~] | M6 |  | `GET /dashboard/system-health` added 2026-09-24: real DB connectivity + ping time (measured server-side, reports `dbConnected: false` with a 200 rather than erroring, so the page still renders during an outage), real Gemini API key presence, real row counts (materials/goods_receipts/audit_log/matching_queue/nl_query_log). `SystemHealth.jsx` rewired to use it. Not done: Ollama status (Ollama isn't wired into the app at all yet — Phase 4), recent errors list, table sizes (bytes on disk). Verified live (dbPingMs 63, all counts real). |
 | 7.4.4 | Admin Home KPIs computed correctly (duplicates, data quality) | [~] | M5 |  | `GET /dashboard/admin` added 2026-09-24: material counts by status, duplicates (all-time matching_queue row count), data-quality score (% of approved materials with non-empty technical_specs, sampled up to 500), 5 most recent materials. `AdminHome.jsx` rewired to use it instead of querying Supabase directly. Unit-tested; verified live (30 materials, 20 approved, 6 pending, 9 duplicates, 100% quality score on real data). Not yet browser-verified. |
 
@@ -402,21 +402,21 @@ A finding is **Closed** only when every step that references it is `[x]` and the
 | A8 | 3.1.5, 3.1.6 | In progress |
 | G1 | 1.2.4, 4.1.1, 4.1.2, 4.1.3, 4.1.4, 4.1.5, 4.1.6, 4.1.7, 4.2.2 | Open |
 | G2 | 4.2.1 | Open |
-| G3 | 5.1.1 | Open |
+| G3 | 5.1.1 | In progress |
 | G4 | 4.1.6, 4.2.3 | Open |
-| G5 | 0.3.4, 1.2.7, 5.1.3, 5.1.4, 5.1.5 | Open |
-| G6 | 5.1.6, 5.1.7, 5.1.8, 5.1.9 | Open |
-| G7 | 5.1.2, 5.1.9 | Open |
+| G5 | 0.3.4, 1.2.7, 5.1.3, 5.1.4, 5.1.5 | In progress |
+| G6 | 5.1.6, 5.1.7, 5.1.8, 5.1.9 | In progress |
+| G7 | 5.1.2, 5.1.9 | In progress |
 | C1 | 1.2.5, 6.1.1, 6.1.2, 6.1.3, 6.1.4, 6.1.5, 6.1.6, 6.1.7, 6.2.1, 6.2.2, 6.2.3, 6.2.4, 6.2.5, 6.2.7 | Open |
 | C2 | 6.2.3, 6.2.6 | Open |
 | C3 | 1.2.5, 6.1.4 | Open |
 | M1 | 7.3.1, 7.3.2, 7.3.3 | In progress |
-| M2 | 7.2.1, 7.2.2 | Open |
-| M3 | 7.4.1, 7.4.2 | Open |
-| M4 | 7.1.1, 7.1.2, 7.1.3, 9.2.5 | Open |
+| M2 | 7.2.1, 7.2.2 | In progress |
+| M3 | 7.4.1, 7.4.2 | In progress |
+| M4 | 7.1.1, 7.1.2, 7.1.3, 9.2.5 | In progress |
 | M5 | 1.2.6, 7.4.4 | In progress |
 | M6 | 1.2.6, 7.4.3 | In progress |
-| M7 | 7.2.1, 7.2.2 | Open |
+| M7 | 7.2.1, 7.2.2 | In progress |
 | D1 | 0.3.2, 1.1.1, 1.1.2 | Open |
 | D2 | 0.3.1, 1.1.3 | Open |
 | D3 | 0.3.3, 1.1.4, 1.1.5, 1.1.6 | Open |
@@ -522,3 +522,10 @@ Known gaps you may notice: unknown barcodes cannot create new materials yet (3.4
 
 - Same day, asked for data to populate so every dashboard can be checked. Wrote `migrations/003_dashboard_demo_data.sql`: 2 new materials (one with technical_specs, one without — so the admin quality score isn't stuck at 100%), 1 new inventory row below its reorder level (additive — no existing inventory row is touched), 1 goods receipt dated today, and 2 matching_queue rows (one pending, one auto_resolved, so all four statuses have an example for Duplicate Detection's filters). Explicitly not the Phase 8 "one consistent dataset" — just enough to click through and see every dashboard element populated. User then asked to remove the "DEMO" tagging from the data itself — rewrote the script so every row reads as an ordinary catalog/business entry (no "demo" marker in any value); the cleanup block now finds rows by their exact inserted values instead of a tag, and a cascade-delete ordering bug in that cleanup block was fixed at the same time.
 - Ran successfully: the user reported the matching_queue verification query's output, confirming both rows landed exactly as designed (1 pending "exact" match, 1 auto_resolved "exact" match). The other three verification queries (materials, low-stock view, today's goods receipt) weren't reported yet — asked for those, and for a real click-through of each dashboard now that there's non-zero data to show.
+
+- Same day, asked "why are these empty" for 5 pages: Material Catalog, Inventory Map, Material Governance, Audit Trail, User Management. Read all 5 files fully before answering. Same root cause as before (direct Supabase reads from the browser, broken by migration 001) on all five, but two of them — Audit Trail and User Management — turned out to already be broken independent of that: Audit Trail selected columns (`old_values`/`new_values`/`metadata`) that never existed in the real schema, and User Management's "create user" inserted a `profiles` row with a random UUID that was never a real `auth.users` id, which would always have violated the foreign key. Reported all five honestly with an accurate effort estimate for each, then asked how to prioritize; the user chose "everything, in one go."
+  - **Backend**: `routers/materials.py` — `GET /materials/count`, `PATCH /materials/{id}/deprecate`, `PATCH /materials` (bulk), `PATCH /materials/{id}` (edit description), `GET /materials/{id}/equivalents`; also fixed `approve_material`'s role list, which missed decision D-7 when it was first applied on 2026-09-22 (accounts still couldn't approve materials specifically, even though matching.py's equivalent was fixed that day). `routers/inventory.py` — `GET /inventory/map` (every active location + its stock, including genuinely empty bins). `routers/audit.py` (new) — `GET /audit`, paginated and filtered, admin-only, with the actor's name joined in. `routers/users.py` (new) — `GET/POST /users`, `PATCH /users/{id}/active`; user creation calls the real Supabase Admin Auth API and then corrects the role/active status the `handle_new_user` trigger would otherwise leave at its least-privilege default (migration 001), returning a one-time temporary password since no email delivery is configured.
+  - **Test fake**: added `.ilike()`/`.or_()` filter support, two new embed relations (`inventory`→`materials`, `audit_log`→`profiles`), and a fake Supabase Auth admin (`list_users`/`create_user`) that faithfully simulates the `handle_new_user` trigger firing on user creation. 172 backend tests pass (was 149).
+  - **Frontend**: all five pages rewired to the real endpoints via the shared `api` client instead of a direct `supabase` import. Along the way: fixed a CSV-export bug in Audit Trail (unescaped commas would corrupt the file), replaced the misleading "Live" label on Inventory Map with honest "manual refresh" text (no realtime publication is set up — G5 still open), and added a one-time-password reveal modal to User Management (the backend now returns a real temporary password that has to go somewhere).
+  - **Deliberately not exercised live**: none of the new *write* endpoints (deprecate, bulk, edit materials; create/deactivate users) were tested against the live database this round — creating a real auth account or mutating real catalog data without a specific go-ahead felt like overreach even under "everything, in one go" for a *build* task. All four read endpoints (`/materials/count`, `/inventory/map`, `/audit`, `/users`) were verified live with real data. Frontend production build succeeds. Nothing here has been browser-verified (clicked through) yet.
+  - **Not done, out of scope for this round**: Material Catalog's category tree is still hardcoded, not loaded from the database (5.1.6); price history isn't shown in the material detail panel (5.1.8); no confirmation dialogs before a bulk governance action fires (7.1.2); no date-range filter UI on Audit Trail (7.2.2); role changes for existing users aren't supported, only at creation (7.4.1).

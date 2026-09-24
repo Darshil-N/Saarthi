@@ -1,18 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Download, Filter, RefreshCw } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
+
+// Real audit_log.action values (services/audit_service.py callers) and entity_type values —
+// this page previously used INSERT/UPDATE/DELETE/APPROVE/DEPRECATE and singular entity names,
+// none of which the app ever actually writes.
+const ACTIONS = [
+  'receipt_confirmed', 'material_approved', 'material_deprecated', 'material_edited',
+  'mapping_approved', 'mapping_rejected', 'materials_merged', 'cnmc_generated',
+  'user_created', 'user_activated', 'user_deactivated',
+];
+const ENTITY_TYPES = ['materials', 'goods_receipts', 'matching_queue', 'user'];
 
 const ACTION_COLORS = {
-  INSERT: 'bg-emerald-100 text-emerald-700',
-  UPDATE: 'bg-blue-100 text-blue-700',
-  DELETE: 'bg-rose-100 text-rose-700',
-  APPROVE: 'bg-indigo-100 text-indigo-700',
-  DEPRECATE: 'bg-amber-100 text-amber-700',
+  material_approved: 'bg-emerald-100 text-emerald-700',
+  material_deprecated: 'bg-amber-100 text-amber-700',
+  material_edited: 'bg-blue-100 text-blue-700',
+  mapping_approved: 'bg-emerald-100 text-emerald-700',
+  mapping_rejected: 'bg-rose-100 text-rose-700',
+  materials_merged: 'bg-indigo-100 text-indigo-700',
+  receipt_confirmed: 'bg-blue-100 text-blue-700',
+  cnmc_generated: 'bg-slate-100 text-slate-600',
+  user_created: 'bg-emerald-100 text-emerald-700',
+  user_activated: 'bg-emerald-100 text-emerald-700',
+  user_deactivated: 'bg-rose-100 text-rose-700',
 };
 
 const ActionBadge = ({ action }) => (
-  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ACTION_COLORS[action] || 'bg-slate-100 text-slate-600'}`}>
-    {action}
+  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${ACTION_COLORS[action] || 'bg-slate-100 text-slate-600'}`}>
+    {action?.replace(/_/g, ' ') || '—'}
   </span>
 );
 
@@ -37,17 +53,14 @@ export default function AuditTrail() {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('audit_log')
-        .select('id, actor_id, action, entity_type, entity_id, old_values, new_values, created_at, metadata')
-        .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-      if (actionFilter !== 'all') query = query.eq('action', actionFilter);
-      if (entityFilter !== 'all') query = query.eq('entity_type', entityFilter);
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data } = await api.get('/audit', {
+        params: {
+          action: actionFilter !== 'all' ? actionFilter : undefined,
+          entity_type: entityFilter !== 'all' ? entityFilter : undefined,
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+        },
+      });
       setLogs(data || []);
     } catch (err) {
       console.error('Error fetching audit log:', err);
@@ -63,7 +76,7 @@ export default function AuditTrail() {
   const filteredLogs = search.trim()
     ? logs.filter(l =>
         (l.entity_id || '').toLowerCase().includes(search.toLowerCase()) ||
-        (l.actor_id || '').toLowerCase().includes(search.toLowerCase()) ||
+        (l.actor_name || '').toLowerCase().includes(search.toLowerCase()) ||
         (l.action || '').toLowerCase().includes(search.toLowerCase())
       )
     : logs;
@@ -72,12 +85,14 @@ export default function AuditTrail() {
     const headers = ['Timestamp', 'Actor', 'Action', 'Entity Type', 'Entity ID'];
     const rows = filteredLogs.map(l => [
       formatTimestamp(l.created_at),
-      l.actor_id || '—',
+      l.actor_name || '—',
       l.action || '—',
       l.entity_type || '—',
       l.entity_id || '—',
     ]);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const csv = [headers, ...rows]
+      .map(r => r.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -100,11 +115,7 @@ export default function AuditTrail() {
               className="pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 appearance-none"
             >
               <option value="all">All Actions</option>
-              <option value="INSERT">INSERT</option>
-              <option value="UPDATE">UPDATE</option>
-              <option value="DELETE">DELETE</option>
-              <option value="APPROVE">APPROVE</option>
-              <option value="DEPRECATE">DEPRECATE</option>
+              {ACTIONS.map(a => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
             </select>
           </div>
           <div className="relative">
@@ -115,10 +126,7 @@ export default function AuditTrail() {
               className="pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 appearance-none"
             >
               <option value="all">All Entities</option>
-              <option value="material">material</option>
-              <option value="goods_receipt">goods_receipt</option>
-              <option value="matching_queue">matching_queue</option>
-              <option value="user">user</option>
+              {ENTITY_TYPES.map(e => <option key={e} value={e}>{e.replace(/_/g, ' ')}</option>)}
             </select>
           </div>
           <button
@@ -134,7 +142,7 @@ export default function AuditTrail() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search actor or entity..."
+              placeholder="Search this page's results..."
               className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
             />
           </div>
@@ -181,20 +189,21 @@ export default function AuditTrail() {
               ) : filteredLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50 transition-colors align-top">
                   <td className="px-5 py-4 text-xs text-slate-400 whitespace-nowrap">{formatTimestamp(log.created_at)}</td>
-                  <td className="px-5 py-4 font-mono text-xs text-slate-600 max-w-[120px] truncate" title={log.actor_id}>
-                    {log.actor_id ? log.actor_id.substring(0, 8) + '…' : 'system'}
+                  <td className="px-5 py-4 text-xs text-slate-600 max-w-[140px] truncate" title={log.actor_id}>
+                    {log.actor_name || 'system'}
+                    {log.actor_role && <span className="text-slate-400"> · {log.actor_role}</span>}
                   </td>
                   <td className="px-5 py-4"><ActionBadge action={log.action} /></td>
-                  <td className="px-5 py-4 text-slate-600 capitalize">{log.entity_type || '—'}</td>
+                  <td className="px-5 py-4 text-slate-600 capitalize">{log.entity_type?.replace(/_/g, ' ') || '—'}</td>
                   <td className="px-5 py-4 font-mono text-xs text-slate-500 max-w-[100px] truncate" title={log.entity_id}>
                     {log.entity_id ? log.entity_id.substring(0, 8) + '…' : '—'}
                   </td>
                   <td className="px-5 py-4 max-w-xs">
-                    {log.new_values ? (
+                    {log.new_value ? (
                       <details className="cursor-pointer">
                         <summary className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">View changes</summary>
                         <pre className="mt-1 text-xs text-slate-500 bg-slate-50 rounded p-2 overflow-x-auto max-w-xs">
-                          {JSON.stringify(log.new_values, null, 2)}
+                          {JSON.stringify(log.new_value, null, 2)}
                         </pre>
                       </details>
                     ) : <span className="text-slate-300 text-xs">—</span>}
@@ -217,7 +226,7 @@ export default function AuditTrail() {
               Previous
             </button>
             <button
-              disabled={filteredLogs.length < PAGE_SIZE}
+              disabled={logs.length < PAGE_SIZE}
               onClick={() => setPage(p => p + 1)}
               className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg disabled:opacity-40 hover:bg-slate-50"
             >

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, CheckCircle, XCircle, AlertCircle, ChevronDown, Edit3, X, Check } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
 const STATUS_FILTERS = ['all', 'pending', 'approved', 'deprecated'];
 
@@ -35,21 +35,17 @@ export default function MaterialGovernance() {
   const fetchMaterials = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('materials')
-        .select('id, cnmc, standard_description, category, subcategory, material_type, status, unit_of_measure, created_at')
-        .order('created_at', { ascending: false });
-
-      if (filter !== 'all') query = query.eq('status', filter);
-      if (search.trim()) {
-        query = query.or(`standard_description.ilike.%${search}%,cnmc.ilike.%${search}%`);
-      }
-
-      const { data, error } = await query.limit(100);
-      if (error) throw error;
+      const { data } = await api.get('/materials', {
+        params: {
+          status_filter: filter !== 'all' ? filter : undefined,
+          search: search.trim() || undefined,
+          limit: 100,
+        },
+      });
       setMaterials(data || []);
     } catch (err) {
       console.error('Error fetching materials:', err);
+      showToast(err.response?.data?.detail || 'Could not load materials', 'error');
     } finally {
       setLoading(false);
     }
@@ -63,16 +59,14 @@ export default function MaterialGovernance() {
   const updateStatus = async (ids, newStatus) => {
     setActionLoading(true);
     try {
-      const { error } = await supabase
-        .from('materials')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .in('id', ids);
-      if (error) throw error;
-      showToast(`${ids.length} material(s) marked as ${newStatus}`);
+      const action = newStatus === 'approved' ? 'approve' : 'deprecate';
+      const { data } = await api.patch('/materials', { ids, action });
+      showToast(`${data.updated} material(s) marked as ${newStatus}`
+        + (data.not_found.length ? ` (${data.not_found.length} not found)` : ''));
       setSelected(new Set());
       fetchMaterials();
     } catch (err) {
-      showToast(`Error: ${err.message}`, 'error');
+      showToast(err.response?.data?.detail || 'Could not update those materials', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -82,16 +76,12 @@ export default function MaterialGovernance() {
     if (!editRow) return;
     setActionLoading(true);
     try {
-      const { error } = await supabase
-        .from('materials')
-        .update({ [editRow.field]: editRow.value, updated_at: new Date().toISOString() })
-        .eq('id', editRow.id);
-      if (error) throw error;
+      await api.patch(`/materials/${editRow.id}`, { [editRow.field]: editRow.value });
       showToast('Material updated successfully');
       setEditRow(null);
       fetchMaterials();
     } catch (err) {
-      showToast(`Error: ${err.message}`, 'error');
+      showToast(err.response?.data?.detail || 'Could not save that edit', 'error');
     } finally {
       setActionLoading(false);
     }

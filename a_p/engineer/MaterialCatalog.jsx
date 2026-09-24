@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, BookOpen, ChevronRight, Package, Tag, Layers, X } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
 const CATEGORY_TREE = {
   MECH: ['FSTNR', 'PIPE', 'VALVE', 'PUMP', 'BEARING', 'GEAR', 'SEAL'],
@@ -44,24 +44,19 @@ export default function MaterialCatalog() {
   const fetchMaterials = useCallback(async () => {
     setLoading(true);
     try {
-      let q = supabase
-        .from('materials')
-        .select(
-          'id, cnmc, category, subcategory, material_type, spec, quality_grade, standard_description, short_description, unit_of_measure, status, created_at',
-          { count: 'exact' }
-        );
-
-      if (selectedCategory) q = q.eq('category', selectedCategory);
-      if (selectedSubcategory) q = q.eq('subcategory', selectedSubcategory);
-      if (search) {
-        q = q.or(`standard_description.ilike.%${search}%,cnmc.ilike.%${search}%`);
-      }
-
-      const from = page * PAGE_SIZE;
-      const { data, count, error } = await q.range(from, from + PAGE_SIZE - 1).order('created_at', { ascending: false });
-      if (error) throw error;
-      setMaterials(data || []);
-      setTotal(count || 0);
+      const params = {
+        category: selectedCategory || undefined,
+        subcategory: selectedSubcategory || undefined,
+        search: search || undefined,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      };
+      const [listRes, countRes] = await Promise.all([
+        api.get('/materials', { params }),
+        api.get('/materials/count', { params }),
+      ]);
+      setMaterials(listRes.data || []);
+      setTotal(countRes.data.total || 0);
     } catch (err) {
       console.error('MaterialCatalog fetch error:', err);
     } finally {
@@ -84,16 +79,8 @@ export default function MaterialCatalog() {
     setDetailEquivalents([]);
     try {
       const [invRes, eqRes] = await Promise.all([
-        supabase
-          .from('inventory')
-          .select('location_code, quantity, reserved_quantity, last_movement_at')
-          .eq('material_id', material.id),
-        supabase
-          .from('matching_queue')
-          .select('*, candidate_material:matched_material_id(standard_description, cnmc)')
-          .eq('new_material_id', material.id)
-          .eq('status', 'approved')
-          .limit(5),
+        api.get('/inventory', { params: { material_id: material.id, limit: 200 } }),
+        api.get(`/materials/${material.id}/equivalents`),
       ]);
       setDetailInventory(invRes.data || []);
       setDetailEquivalents(eqRes.data || []);
@@ -310,8 +297,8 @@ export default function MaterialCatalog() {
                     <div className="space-y-2">
                       {detailEquivalents.map((eq, i) => (
                         <div key={i} className="p-2 bg-teal-50 rounded-lg">
-                          <p className="text-xs font-mono text-teal-700">{eq.candidate_material?.cnmc}</p>
-                          <p className="text-xs text-slate-700 mt-0.5">{eq.candidate_material?.standard_description}</p>
+                          <p className="text-xs font-mono text-teal-700">{eq.cnmc}</p>
+                          <p className="text-xs text-slate-700 mt-0.5">{eq.standard_description}</p>
                         </div>
                       ))}
                     </div>

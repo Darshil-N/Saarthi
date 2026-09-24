@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, ShieldOff, Search, X } from 'lucide-react';
-import supabase from '../utils/supabase';
+import { Users, Plus, ShieldOff, Search, X, Copy } from 'lucide-react';
+import api from '../../arya_frontend/src/lib/api';
 
 const ROLES = ['admin', 'entry_operator', 'engineer', 'accounts'];
 
@@ -23,10 +23,11 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', full_name: '', role: 'entry_operator' });
+  const [newUser, setNewUser] = useState({ email: '', full_name: '', role: 'entry_operator', department: '' });
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState(null);
   const [deactivating, setDeactivating] = useState(null);
+  const [createdCredentials, setCreatedCredentials] = useState(null); // { email, temporary_password }
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -36,14 +37,11 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, org_unit, is_active, created_at')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
+      const { data } = await api.get('/users');
       setUsers(data || []);
     } catch (err) {
       console.error('Error fetching users:', err);
+      showToast(err.response?.data?.detail || 'Could not load users', 'error');
     } finally {
       setLoading(false);
     }
@@ -54,15 +52,11 @@ export default function UserManagement() {
   const toggleUserActive = async (userId, currentStatus) => {
     setDeactivating(userId);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_active: !currentStatus })
-        .eq('id', userId);
-      if (error) throw error;
+      await api.patch(`/users/${userId}/active`, { is_active: !currentStatus });
       showToast(currentStatus ? 'User deactivated' : 'User reactivated');
       fetchUsers();
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(err.response?.data?.detail || err.message, 'error');
     } finally {
       setDeactivating(null);
     }
@@ -75,23 +69,20 @@ export default function UserManagement() {
     }
     setCreating(true);
     try {
-      // In production, this would call a backend API to create auth user
-      // For now we insert directly into profiles (backend/edge function would handle auth)
-      const { error } = await supabase
-        .from('profiles')
-        .insert([{
-          id: crypto.randomUUID(),
-          full_name: newUser.full_name,
-          role: newUser.role,
-          is_active: true,
-        }]);
-      if (error) throw error;
+      const { data } = await api.post('/users', {
+        email: newUser.email,
+        full_name: newUser.full_name,
+        role: newUser.role,
+        department: newUser.department || undefined,
+      });
       showToast(`User "${newUser.full_name}" created successfully`);
-      setNewUser({ email: '', full_name: '', role: 'entry_operator' });
+      setNewUser({ email: '', full_name: '', role: 'entry_operator', department: '' });
       setShowCreate(false);
+      // No email delivery configured — show the one-time password so the admin can pass it on.
+      setCreatedCredentials({ email: data.email, temporary_password: data.temporary_password });
       fetchUsers();
     } catch (err) {
-      showToast(`Error: ${err.message}`, 'error');
+      showToast(err.response?.data?.detail || `Error: ${err.message}`, 'error');
     } finally {
       setCreating(false);
     }
@@ -111,6 +102,38 @@ export default function UserManagement() {
           toast.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'
         }`}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* One-time temporary password reveal */}
+      {createdCredentials && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 className="font-bold text-slate-800 text-lg">User created</h3>
+            <p className="text-sm text-slate-500">
+              There's no email delivery configured, so share this temporary password with{' '}
+              <span className="font-medium text-slate-700">{createdCredentials.email}</span> yourself —
+              it won't be shown again.
+            </p>
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              <code className="flex-1 text-sm font-mono text-slate-800 break-all">
+                {createdCredentials.temporary_password}
+              </code>
+              <button
+                onClick={() => navigator.clipboard?.writeText(createdCredentials.temporary_password)}
+                className="text-slate-400 hover:text-indigo-600 shrink-0"
+                title="Copy"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              onClick={() => setCreatedCredentials(null)}
+              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
 
@@ -186,6 +209,15 @@ export default function UserManagement() {
                   {ROLES.map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Department (optional)</label>
+                <input
+                  value={newUser.department}
+                  onChange={e => setNewUser(p => ({ ...p, department: e.target.value }))}
+                  placeholder="e.g. Warehouse Intake"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </div>
             </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowCreate(false)} className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
@@ -211,7 +243,7 @@ export default function UserManagement() {
               <tr>
                 <th className="px-5 py-3">Name</th>
                 <th className="px-5 py-3">Role</th>
-                <th className="px-5 py-3">Org Unit</th>
+                <th className="px-5 py-3">Department</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Joined</th>
                 <th className="px-5 py-3">Actions</th>
@@ -239,7 +271,7 @@ export default function UserManagement() {
                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-4 font-medium text-slate-800">{user.full_name || '—'}</td>
                   <td className="px-5 py-4"><RoleBadge role={user.role} /></td>
-                  <td className="px-5 py-4 text-slate-500">{user.org_unit || '—'}</td>
+                  <td className="px-5 py-4 text-slate-500">{user.department || '—'}</td>
                   <td className="px-5 py-4">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                       user.is_active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
