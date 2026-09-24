@@ -4,7 +4,7 @@ import {
   Database, Package, MessageSquare, Map,
   ArrowRight, CheckCircle2, Clock, TrendingUp
 } from 'lucide-react';
-import supabase from '../utils/supabase';
+import api from '../../arya_frontend/src/lib/api';
 
 const MetricCard = ({ title, value, icon: Icon, color, description, onClick }) => (
   <div
@@ -37,30 +37,15 @@ export default function EngineerHome() {
   useEffect(() => {
     async function fetchAll() {
       try {
-        const [totalRes, approvedRes, pendingRes, invRes, recentRes, lowStockRes] = await Promise.all([
-          supabase.from('materials').select('id', { count: 'exact', head: true }),
-          supabase.from('materials').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
-          supabase.from('materials').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('inventory').select('location_code', { count: 'exact', head: true }),
-          supabase.from('materials')
-            .select('id, cnmc, standard_description, status, category, created_at')
-            .eq('status', 'approved')
-            .order('created_at', { ascending: false })
-            .limit(6),
-          supabase.from('inventory')
-            .select('id, material_id, location_code, quantity_on_hand, materials(standard_description, cnmc)')
-            .order('quantity_on_hand', { ascending: true })
-            .limit(5),
-        ]);
-
+        const { data } = await api.get('/dashboard/engineer');
         setStats({
-          totalMaterials: totalRes.count,
-          approvedMaterials: approvedRes.count,
-          pendingMaterials: pendingRes.count,
-          totalInventoryLocations: invRes.count,
+          totalMaterials: data.totalMaterials,
+          approvedMaterials: data.approvedMaterials,
+          pendingMaterials: data.pendingMaterials,
+          totalInventoryLocations: data.totalInventoryLocations,
         });
-        setRecentMaterials(recentRes.data || []);
-        setLowStockItems(lowStockRes.data || []);
+        setRecentMaterials(data.recentMaterials || []);
+        setLowStockItems(data.lowStock || []);
       } catch (err) {
         console.error('EngineerHome fetch error:', err);
       } finally {
@@ -167,7 +152,7 @@ export default function EngineerHome() {
         {/* Low Stock Alert */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-slate-800">Lowest Stock Levels</h3>
+            <h3 className="font-bold text-slate-800">Low Stock Alerts</h3>
             <button
               onClick={() => navigate('/engineer/inventory-map')}
               className="text-sm text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1"
@@ -182,26 +167,26 @@ export default function EngineerHome() {
               ))}
             </div>
           ) : lowStockItems.length === 0 ? (
-            <p className="text-slate-400 text-sm py-6 text-center">No inventory data yet</p>
+            <p className="text-slate-400 text-sm py-6 text-center">No materials are at or below their reorder level</p>
           ) : (
             <div className="space-y-3">
               {lowStockItems.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+                <div key={item.material_id} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
                   <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                    item.quantity_on_hand <= 5 ? 'bg-red-500' :
-                    item.quantity_on_hand <= 20 ? 'bg-amber-400' : 'bg-emerald-400'
+                    item.alert_type === 'out_of_stock' ? 'bg-red-500' : 'bg-amber-400'
                   }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">
-                      {item.materials?.standard_description || item.material_id}
+                      {item.standard_description || item.cnmc}
                     </p>
-                    <p className="text-xs text-slate-400">{item.location_code}</p>
+                    <p className="text-xs text-slate-400">
+                      {item.cnmc} · reorder at {item.reorder_level} {item.unit_of_measure}
+                    </p>
                   </div>
                   <span className={`text-sm font-bold tabular-nums ${
-                    item.quantity_on_hand <= 5 ? 'text-red-600' :
-                    item.quantity_on_hand <= 20 ? 'text-amber-600' : 'text-emerald-600'
+                    item.alert_type === 'out_of_stock' ? 'text-red-600' : 'text-amber-600'
                   }`}>
-                    {item.quantity_on_hand}
+                    {item.total_quantity} {item.unit_of_measure}
                   </span>
                 </div>
               ))}

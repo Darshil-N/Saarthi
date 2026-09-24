@@ -131,6 +131,26 @@ class TestDashboard:
         r = client.get("/dashboard/entry")
         assert r.status_code == 502 and "dashboard" in r.json()["detail"].lower()
 
+    def test_engineer_counts_lists_and_low_stock(self, client, db):
+        # MATERIAL_A (approved) and MATERIAL_B (pending) already exist from the db fixture.
+        db.seed("materials", status="approved", cnmc="X-1", standard_description="Extra approved")
+        db.seed("inventory", material_id=MATERIAL_A, location_code=LOC_1, quantity=3)
+        db.seed("v_low_stock_alerts", material_id=MATERIAL_A, cnmc="MECH-FSTNR-BOLT-M8X25-SS304-A",
+                standard_description="Hexagonal Head Bolt M8x25mm SS304", category="MECH",
+                unit_of_measure="EA", total_quantity=3, reorder_level=10, alert_type="low_stock")
+
+        body = client.get("/dashboard/engineer").json()
+        assert body["totalMaterials"] == 4          # MATERIAL_A, MATERIAL_B, MATERIAL_DEPRECATED, the extra one
+        assert body["approvedMaterials"] == 2
+        assert body["pendingMaterials"] == 1
+        assert body["totalInventoryLocations"] == 1
+        assert len(body["lowStock"]) == 1 and body["lowStock"][0]["material_id"] == MATERIAL_A
+
+    def test_engineer_database_failure_is_reported_not_shown_as_zeros(self, client, db):
+        db.fail("materials", "select")
+        r = client.get("/dashboard/engineer")
+        assert r.status_code == 502 and "dashboard" in r.json()["detail"].lower()
+
 
 class TestRequestContext:
     def test_response_carries_request_id(self, client):
