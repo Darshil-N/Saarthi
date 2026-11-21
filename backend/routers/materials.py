@@ -341,6 +341,26 @@ def edit_material(
     return resp.data[0]
 
 
+@router.get("/{material_id}/price-history")
+def material_price_history(
+    material_id: str,
+    limit: int = Query(24, ge=1, le=100),
+    supabase: Client = Depends(get_supabase),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """12-month purchase price trend for a material (plan step 5.1.8)."""
+    material_id = require_uuid(material_id, "Material")
+    resp = (
+        supabase.table("price_history")
+        .select("purchase_date,vendor_name,quantity,unit_price")
+        .eq("material_id", material_id)
+        .order("purchase_date", desc=False)
+        .limit(limit)
+        .execute()
+    )
+    return resp.data or []
+
+
 @router.get("/{material_id}/equivalents")
 def material_equivalents(
     material_id: str,

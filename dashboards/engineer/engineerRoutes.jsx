@@ -6,6 +6,7 @@ import EngineerDashboard from './EngineerDashboard';
 import EngineerHome from './EngineerHome';
 import NLQuery from './NLQuery';
 import MaterialCatalog from './MaterialCatalog';
+import MaterialDetail from './MaterialDetail';
 import InventoryMap from './InventoryMap';
 
 const engineerRoutes = {
@@ -15,6 +16,7 @@ const engineerRoutes = {
     { index: true, element: <EngineerHome /> },
     { path: 'nl-query', element: <NLQuery /> },
     { path: 'catalog', element: <MaterialCatalog /> },
+    { path: 'material/:id', element: <MaterialDetail /> },
     { path: 'inventory-map', element: <InventoryMap /> },
   ],
 };

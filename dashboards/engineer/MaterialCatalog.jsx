@@ -236,6 +236,15 @@ export default function MaterialCatalog() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+              <div className="px-5 py-3 border-b border-slate-100">
+                <button
+                  onClick={() => navigate(`/engineer/material/${detailMaterial.id}`)}
+                  className="w-full text-xs font-semibold text-teal-700 hover:text-white hover:bg-teal-600 border border-teal-300 rounded-lg px-3 py-2 flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                  View Full Detail Page
+                </button>
+              </div>
 
               <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
                 {/* Specs */}

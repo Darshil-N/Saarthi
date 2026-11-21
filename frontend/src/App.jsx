@@ -14,6 +14,7 @@ import EngineerDashboard from '../../dashboards/engineer/EngineerDashboard';
 import EngineerHome from '../../dashboards/engineer/EngineerHome';
 import NLQuery from '../../dashboards/engineer/NLQuery';
 import MaterialCatalog from '../../dashboards/engineer/MaterialCatalog';
+import MaterialDetail from '../../dashboards/engineer/MaterialDetail';
 import InventoryMap from '../../dashboards/engineer/InventoryMap';
 import AccountsDashboard from '../../dashboards/AccountsDashboard';
 import AccountsHome from '../../dashboards/pages/AccountsHome';
@@ -59,6 +60,7 @@ function App() {
           <Route index element={<EngineerHome />} />
           <Route path="nl-query" element={<NLQuery />} />
           <Route path="catalog" element={<MaterialCatalog />} />
+          <Route path="material/:id" element={<MaterialDetail />} />
           <Route path="inventory-map" element={<InventoryMap />} />
         </Route>
       </Route>
